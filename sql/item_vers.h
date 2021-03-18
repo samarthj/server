@@ -49,7 +49,7 @@ public:
   virtual LEX_CSTRING func_name_cstring() const override
   {
     static LEX_CSTRING name= {STRING_WITH_LEN("is_history") };
-   return name;
+    return name;
   }
   virtual void print(String *str, enum_query_type query_type);
   Item *get_copy(THD *thd)
