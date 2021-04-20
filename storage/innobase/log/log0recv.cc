@@ -608,9 +608,13 @@ private:
 public:
   bool add(uint32_t space, std::string f_name, lsn_t lsn)
   {
-    const defer_t defer= {lsn, f_name};
+    char *fil_path= fil_make_filepath(
+      NULL, {f_name.c_str(), strlen(f_name.c_str())},
+      IBD, false);
+    const defer_t defer= {lsn, fil_path};
     std::pair<defer_map::iterator, bool> p= defers.insert(
       defer_map::value_type(space, defer));
+    ut_free(fil_path);
     if (p.second) return true;
     if (p.first->second.lsn > defer.lsn) return false;
     p.first->second= defer;
@@ -629,6 +633,8 @@ public:
       return &it->second;
     return nullptr;
   }
+
+  void clear() { defers.clear(); }
 
   dberr_t reinit_all();
 };
@@ -1120,7 +1126,7 @@ void recv_sys_t::close()
   recv_spaces.clear();
   renamed_spaces.clear();
   mlog_init.clear();
-
+  deferred_spaces.clear();
   close_files();
 }
 

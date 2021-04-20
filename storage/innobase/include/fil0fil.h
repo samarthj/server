@@ -507,6 +507,8 @@ public:
   /** @return whether the storage device is rotational (HDD, not SSD) */
   inline bool is_rotational() const;
 
+  inline bool is_deferred() const;
+
   /** Open each file. Never invoked on .ibd files.
   @param create_new_db    whether to skip the call to fil_node_t::read_page0()
   @return whether all files were opened */
@@ -1129,7 +1131,7 @@ struct fil_node_t final
   void set_deferred(bool val) { deferred= val; }
 
   /** @retval whether the tablespace is deferred */
-  bool is_deferred() { return deferred; }
+  bool is_deferred() const { return deferred; }
 
 private:
   /** Does stuff common for close() and detach() */
@@ -1151,6 +1153,15 @@ inline bool fil_space_t::is_rotational() const
   for (const fil_node_t *node= UT_LIST_GET_FIRST(chain); node;
        node= UT_LIST_GET_NEXT(chain, node))
     if (!node->on_ssd)
+      return true;
+  return false;
+}
+
+inline bool fil_space_t::is_deferred() const
+{
+  for (const fil_node_t *node= UT_LIST_GET_FIRST(chain); node;
+       node= UT_LIST_GET_NEXT(chain, node))
+    if (node->is_deferred())
       return true;
   return false;
 }
