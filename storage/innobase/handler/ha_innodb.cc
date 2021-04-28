@@ -6209,7 +6209,7 @@ initialize_auto_increment(dict_table_t* table, const Field* field)
 @return	error code
 @retval	0	on success */
 int
-ha_innobase::open(const char* name, int, uint)
+ha_innobase::open(const char* name, int, uint flags)
 {
 	char			norm_name[FN_REFLEN];
 
@@ -6275,9 +6275,11 @@ no_such_table:
 
 	if (dict_table_is_discarded(ib_table)) {
 
-		ib_senderrf(thd,
-			IB_LOG_LEVEL_WARN, ER_TABLESPACE_DISCARDED,
-			table->s->table_name.str);
+		if (!(flags & HA_OPEN_DISCARDED)) {
+			ib_senderrf(thd,
+				IB_LOG_LEVEL_WARN, ER_TABLESPACE_DISCARDED,
+				table->s->table_name.str);
+		}
 
 		/* Allow an open because a proper DISCARD should have set
 		all the flags and index root page numbers to FIL_NULL that
@@ -11254,7 +11256,8 @@ err_col:
 			err = row_create_table_for_mysql(
 				table, m_trx,
 				fil_encryption_t(options->encryption),
-				uint32_t(options->encryption_key_id));
+				uint32_t(options->encryption_key_id),
+				m_create_info->discarded);
 			m_drop_before_rollback = (err == DB_SUCCESS);
 		}
 
@@ -12231,6 +12234,10 @@ index_bad:
 	DBUG_EXECUTE_IF("innodb_test_wrong_fts_aux_table_name",
 			m_flags2 &= ~DICT_TF2_FTS_AUX_HEX_NAME;);
 
+	if (m_create_info->discarded) {
+		m_flags2 |= DICT_TF2_DISCARDED;
+	}
+
 	DBUG_RETURN(true);
 }
 
@@ -13002,7 +13009,9 @@ create_table_info_t::create_table_update_dict()
 
 	innobase_copy_frm_flags_from_create_info(innobase_table, m_create_info);
 
-	dict_stats_update(innobase_table, DICT_STATS_EMPTY_TABLE);
+	if (!m_create_info->discarded) {
+		dict_stats_update(innobase_table, DICT_STATS_EMPTY_TABLE);
+	}
 
 	if (innobase_table) {
 		/* We update the highest file format in the system table

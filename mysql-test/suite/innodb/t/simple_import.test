@@ -1,0 +1,54 @@
+--source include/have_innodb.inc
+
+let $MYSQLD_DATADIR = `SELECT @@datadir`;
+
+
+create table t1 (
+   id int AUTO_INCREMENT PRIMARY KEY,
+   dt datetime
+) engine=innodb;
+
+INSERT INTO t1 VALUES (1, '2021-05-05');
+
+
+FLUSH TABLES t1 FOR EXPORT;
+
+--copy_file $MYSQLD_DATADIR/test/t1.ibd $MYSQLD_DATADIR/test/t2.ibd
+--copy_file $MYSQLD_DATADIR/test/t1.cfg $MYSQLD_DATADIR/test/t2.cfg
+--copy_file $MYSQLD_DATADIR/test/t1.frm $MYSQLD_DATADIR/test/t2.frm
+
+UNLOCK TABLES;
+DROP TABLE t1;
+
+ALTER TABLE t2 IMPORT TABLESPACE;
+
+SELECT * FROM t2;
+CHECK TABLE t2;
+
+DROP TABLE t2;
+
+
+create table t1 (
+   id int AUTO_INCREMENT PRIMARY KEY,
+   txt text,
+   id2 int unique
+) engine=innodb;
+
+INSERT INTO t1 VALUES (1, '2021-05-05', 1);
+
+
+FLUSH TABLES t1 FOR EXPORT;
+
+--copy_file $MYSQLD_DATADIR/test/t1.ibd $MYSQLD_DATADIR/test/t2.ibd
+--copy_file $MYSQLD_DATADIR/test/t1.cfg $MYSQLD_DATADIR/test/t2.cfg
+--copy_file $MYSQLD_DATADIR/test/t1.frm $MYSQLD_DATADIR/test/t2.frm
+
+UNLOCK TABLES;
+DROP TABLE t1;
+
+ALTER TABLE t2 IMPORT TABLESPACE;
+
+SELECT * FROM t2;
+CHECK TABLE t2;
+
+DROP TABLE t2;

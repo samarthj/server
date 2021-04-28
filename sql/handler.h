@@ -1685,6 +1685,7 @@ struct Table_scope_and_contents_source_st
   ulong key_block_size;
   ulong expression_length;
   ulong field_check_constraints;
+  bool discarded;
   /*
     number of pages to sample during
     stats estimation, if used, otherwise 0.

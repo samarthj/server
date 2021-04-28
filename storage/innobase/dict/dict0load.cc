@@ -2826,7 +2826,7 @@ dict_load_tablespace(
 	}
 
 	if (table->flags2 & DICT_TF2_DISCARDED) {
-		ib::warn() << "Tablespace for table " << table->name
+		ib::info() << "Tablespace for table " << table->name
 			<< " is set as discarded.";
 		table->file_unreadable = true;
 		return;

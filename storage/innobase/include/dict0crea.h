@@ -43,7 +43,8 @@ tab_create_graph_create(
 					a memory data structure */
 	mem_heap_t*	heap,		/*!< in: heap where created */
 	fil_encryption_t mode,		/*!< in: encryption mode */
-	uint32_t	key_id);	/*!< in: encryption key_id */
+	uint32_t	key_id,		/*!< in: encryption key_id */
+	bool		discarded = false);
 
 /** Creates an index create graph.
 @param[in]	index	index to create, built as a memory data structure
@@ -283,6 +284,7 @@ struct tab_node_t{
 	uint		key_id;	/*!< encryption key_id */
 	fil_encryption_t mode;	/*!< encryption mode */
 	ulint		base_col_no;	/*!< next base column to insert */
+	bool		discarded;
 	mem_heap_t*	heap;		/*!< memory heap used as auxiliary
 					storage */
 };

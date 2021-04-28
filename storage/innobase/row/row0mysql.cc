@@ -2211,7 +2211,8 @@ row_create_table_for_mysql(
 				added to the data dictionary cache) */
 	trx_t*		trx,	/*!< in/out: transaction */
 	fil_encryption_t mode,	/*!< in: encryption mode */
-	uint32_t	key_id)	/*!< in: encryption key_id */
+	uint32_t	key_id,	/*!< in: encryption key_id */
+	bool		discarded)
 {
 	tab_node_t*	node;
 	mem_heap_t*	heap;
@@ -2260,7 +2261,8 @@ err_exit:
 		ut_ad(strstr(table->name.m_name, "/FTS_") != NULL);
 	}
 
-	node = tab_create_graph_create(table, heap, mode, key_id);
+	node = tab_create_graph_create(table, heap, mode, key_id,
+				       discarded);
 
 	thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 
@@ -2273,7 +2275,8 @@ err_exit:
 
 	/* Update SYS_TABLESPACES and SYS_DATAFILES if a new file-per-table
 	tablespace was created. */
-	if (err == DB_SUCCESS && dict_table_is_file_per_table(table)) {
+	if (err == DB_SUCCESS && dict_table_is_file_per_table(table)
+	    && !discarded) {
 
 		ut_ad(dict_table_is_file_per_table(table));
 

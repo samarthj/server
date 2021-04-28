@@ -85,6 +85,7 @@
 	/* Defines for use with openfrm, openprt and openfrd */
 
 #define READ_ALL               (1 <<  0) /* openfrm: Read all parameters */
+#define MAYBE_DISCARDED        (1 <<  1)
 #define EXTRA_RECORD           (1 <<  3) /* Reserve space for an extra record */
 #define DELAYED_OPEN           (1 << 12) /* Open table later */
 #define OPEN_VIEW_NO_PARSE     (1 << 14) /* Open frm only if it's a view,

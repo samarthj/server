@@ -342,7 +342,8 @@ row_create_table_for_mysql(
 				added to the data dictionary cache) */
 	trx_t*		trx,	/*!< in/out: transaction */
 	fil_encryption_t mode,	/*!< in: encryption mode */
-	uint32_t	key_id)	/*!< in: encryption key_id */
+	uint32_t	key_id,	/*!< in: encryption key_id */
+	bool		discarded = false)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /*********************************************************************//**

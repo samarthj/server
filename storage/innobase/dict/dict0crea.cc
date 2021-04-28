@@ -366,7 +366,19 @@ dict_build_table_def_step(
 			DICT_TF2_FLAG_UNSET(table,
 					    DICT_TF2_FTS_AUX_HEX_NAME););
 
-	if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_USE_FILE_PER_TABLE)) {
+	if (node->discarded) {
+		ulint	space;
+		/* Get a new tablespace ID */
+		dict_hdr_get_new_id(NULL, NULL, &space, table, false);
+
+		if (space == ULINT_UNDEFINED) {
+			return DB_ERROR;
+		}
+		table->space = static_cast<uint32_t>(space);
+
+		// do not create file
+
+	} else if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_USE_FILE_PER_TABLE)) {
 		/* This table will need a new tablespace. */
 
 		ut_ad(dict_table_get_format(table) <= UNIV_FORMAT_MAX);
@@ -1220,7 +1232,8 @@ tab_create_graph_create(
 				structure */
 	mem_heap_t*	heap,	/*!< in: heap where created */
 	fil_encryption_t mode,	/*!< in: encryption mode */
-	uint32_t	key_id)	/*!< in: encryption key_id */
+	uint32_t	key_id,	/*!< in: encryption key_id */
+	bool		discarded)
 {
 	tab_node_t*	node;
 
@@ -1235,6 +1248,7 @@ tab_create_graph_create(
 	node->heap = mem_heap_create(256);
 	node->mode = mode;
 	node->key_id = key_id;
+	node->discarded = discarded;
 
 	node->tab_def = ins_node_create(INS_DIRECT, dict_sys->sys_tables,
 					heap);
@@ -1397,7 +1411,9 @@ dict_create_table_step(
 	if (node->state == TABLE_ADD_TO_CACHE) {
 		DBUG_EXECUTE_IF("ib_ddl_crash_during_create", DBUG_SUICIDE(););
 
-		dict_table_add_to_cache(node->table, TRUE, node->heap);
+		if (!node->discarded) {
+			dict_table_add_to_cache(node->table, TRUE, node->heap);
+		}
 
 		err = DB_SUCCESS;
 	}

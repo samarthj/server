@@ -3422,6 +3422,9 @@ partititon_err:
     int ha_err= outparam->file->ha_open(outparam, share->normalized_path.str,
                                  (db_stat & HA_READ_ONLY ? O_RDONLY : O_RDWR),
                                   ha_open_flags);
+    if (ha_err == HA_ERR_NO_SUCH_TABLE && prgflag & MAYBE_DISCARDED)
+      ha_err= 0;
+
     if (ha_err)
     {
       share->open_errno= ha_err;

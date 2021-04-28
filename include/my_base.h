@@ -53,6 +53,7 @@
   will fix the table structure.
 */
 #define HA_OPEN_FOR_ALTER		4096U
+static const uint HA_OPEN_DISCARDED= 8192;
 
 /* The following is parameter to ha_rkey() how to use key */
 
