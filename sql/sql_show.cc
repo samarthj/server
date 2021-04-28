@@ -8140,7 +8140,9 @@ TABLE *create_schema_table(THD *thd, TABLE_LIST *table_list)
   CHARSET_INFO *cs= system_charset_info;
   MEM_ROOT *mem_root= thd->mem_root;
   bool need_all_fieds= table_list->schema_table_reformed || // SHOW command
-                       thd->lex->only_view_structure(); // need table structure
+                       thd->lex->only_view_structure() || // need table structure
+                       thd->lex->sql_command == SQLCOM_SHOW_FIELDS ||
+                       thd->lex->sql_command == SQLCOM_SHOW_TABLES;
   DBUG_ENTER("create_schema_table");
 
   for (; fields_info->field_name; fields_info++)

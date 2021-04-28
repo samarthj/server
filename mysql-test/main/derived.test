@@ -1069,3 +1069,32 @@ analyze select * from t1 , ( (select t2.a from t2 order by c) union all (select 
 select * from t1 , ( (select t2.a from t2 order by c) union all (select  t2.a from t2 order by c) except(select t3.a from t3 order by b))q  where t1.a=q.a;
 
 drop table t1,t2,t3;
+
+--echo #
+--echo # MDEV-21603: materialized derived used in SHOW TABLES
+--echo #
+
+create table t1 (nm varchar(32), a int);
+insert into t1 values ('1',1),('2',2),('3',3);
+use mysql;
+show tables
+  where tables_in_mysql in (select *
+                              from (select nm from test.t1 group by nm) dt);
+show fields from test.t1
+   where Field in (select * from (select nm from test.t1 group by nm) dt);
+insert into test.t1 values ('nm',0);
+show fields from test.t1
+   where Field in (select * from (select nm from test.t1 group by nm) dt);
+
+show fields from test.t1
+   where Field in
+        (select * from (select column_name from information_schema.columns
+                          where table_name='t1'
+                            group by column_name) dt);
+
+use test;
+drop table t1;
+
+--echo #
+--echo # End of 10.2 tests
+--echo #

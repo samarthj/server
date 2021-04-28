@@ -1260,3 +1260,34 @@ a	a
 4	4
 6	6
 drop table t1,t2,t3;
+#
+# MDEV-21603: materialized derived used in SHOW TABLES
+#
+create table t1 (nm varchar(32), a int);
+insert into t1 values ('1',1),('2',2),('3',3);
+use mysql;
+show tables
+where tables_in_mysql in (select *
+from (select nm from test.t1 group by nm) dt);
+Tables_in_mysql
+show fields from test.t1
+where Field in (select * from (select nm from test.t1 group by nm) dt);
+Field	Type	Null	Key	Default	Extra
+insert into test.t1 values ('nm',0);
+show fields from test.t1
+where Field in (select * from (select nm from test.t1 group by nm) dt);
+Field	Type	Null	Key	Default	Extra
+nm	varchar(32)	YES		NULL	
+show fields from test.t1
+where Field in
+(select * from (select column_name from information_schema.columns
+where table_name='t1'
+                            group by column_name) dt);
+Field	Type	Null	Key	Default	Extra
+nm	varchar(32)	YES		NULL	
+a	int(11)	YES		NULL	
+use test;
+drop table t1;
+#
+# End of 10.2 tests
+#
