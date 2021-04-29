@@ -720,6 +720,7 @@ struct export_var_t{
 	ulint innodb_data_reads;		/*!< I/O read requests */
 	ulint innodb_dblwr_pages_written;	/*!< srv_dblwr_pages_written */
 	ulint innodb_dblwr_writes;		/*!< srv_dblwr_writes */
+	ulint innodb_fts_optimize_queue_count;	/*!< fts_optimize_queue_count */
 	ulint innodb_deadlocks;
 	ulint innodb_history_list_length;
 	ulint innodb_log_waits;			/*!< srv_log_waits */

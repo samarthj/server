@@ -73,6 +73,7 @@ Created 10/8/1995 Heikki Tuuri
 #include "fil0pagecompress.h"
 #include "trx0types.h"
 #include <list>
+#include "fts0fts.h"
 
 #include <my_service_manager.h>
 /* The following is the maximum allowed duration of a lock wait. */
@@ -1063,6 +1064,9 @@ srv_export_innodb_status(void)
 		export_vars.innodb_dblwr_writes = buf_dblwr.batches();
 		buf_dblwr.unlock();
 	}
+
+	export_vars.innodb_fts_optimize_queue_count =
+		fts_optimize_get_queue_count();
 
 	export_vars.innodb_data_written = srv_stats.data_written + dblwr;
 

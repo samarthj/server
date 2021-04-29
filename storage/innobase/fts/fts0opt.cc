@@ -2545,6 +2545,13 @@ static void timer_callback(void*)
   srv_thread_pool->submit_task(&task);
 }
 
+ulint fts_optimize_get_queue_count(void)
+{
+  if (!fts_optimize_wq)
+    return 0;
+  return ib_wqueue_len(fts_optimize_wq);
+}
+
 /** Add the table to add to the OPTIMIZER's list.
 @param[in]	table	table to add */
 void fts_optimize_add_table(dict_table_t* table)

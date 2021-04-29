@@ -934,6 +934,8 @@ static SHOW_VAR innodb_status_variables[]= {
   {"ibuf_merges", &ibuf.n_merges, SHOW_SIZE_T},
   {"ibuf_segment_size", &ibuf.seg_size, SHOW_SIZE_T},
   {"ibuf_size", &ibuf.size, SHOW_SIZE_T},
+  {"fts_optimize_queue_count",
+   (char *)&export_vars.innodb_fts_optimize_queue_count, SHOW_LONG},
   {"log_waits", &export_vars.innodb_log_waits, SHOW_SIZE_T},
   {"log_write_requests", &export_vars.innodb_log_write_requests, SHOW_SIZE_T},
   {"log_writes", &export_vars.innodb_log_writes, SHOW_SIZE_T},

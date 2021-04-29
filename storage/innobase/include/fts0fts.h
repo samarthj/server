@@ -638,6 +638,8 @@ fts_optimize_table(
 /*===============*/
 	dict_table_t*	table);			/*!< in: table to optimiza */
 
+ulint fts_optimize_get_queue_count(void);
+
 /**********************************************************************//**
 Startup the optimize thread and create the work queue. */
 void
