@@ -588,30 +588,33 @@ static std::map<uint32_t,std::string> renamed_spaces;
 
 /** Information about deferred tablespace during redo log
 processing. */
-class deferred_spaces_t
+class deferred_spaces_
 {
 public:
-  struct defer_t
+  /** Maintains the last opened defer file name along with lsn */
+  struct defer_
   {
     lsn_t lsn;
     std::string file_name;
-
-    defer_t(lsn_t lsn_, std::string f_name): lsn(lsn_), file_name(f_name) {}
   };
 private:
-  typedef std::map<uint32_t, defer_t,
-                   std::less<uint32_t>,
-                   ut_allocator<std::pair<uint32_t, defer_t> > > defer_map;
+  using defer_map= std::map<uint32_t, defer_, std::less<uint32_t>,
+			    ut_allocator<std::pair<uint32_t, defer_> > >;
 
   /** Map of defer tablespaces */
   defer_map defers;
 public:
+  /** Add the deferred space only if it is latest one
+  @param space  space identifier
+  @param f_name	file name
+  @param lsn	log sequence number
+  @return true if is inserted successfully */
   bool add(uint32_t space, std::string f_name, lsn_t lsn)
   {
     char *fil_path= fil_make_filepath(
       NULL, {f_name.c_str(), strlen(f_name.c_str())},
       IBD, false);
-    const defer_t defer= {lsn, fil_path};
+    const defer_ defer= {lsn, fil_path};
     std::pair<defer_map::iterator, bool> p= defers.insert(
       defer_map::value_type(space, defer));
     ut_free(fil_path);
@@ -621,12 +624,15 @@ public:
     return true;
   }
 
+  /** Remove the deferred space */
   void remove(uint32_t space)
   {
     defers.erase(space);
   }
 
-  defer_t *is_exist(uint32_t space)
+  /** Find whether the given space exist is in
+  deferred spaces */
+  const defer_ *find(uint32_t space)
   {
     auto it= defers.find(space);
     if (it != defers.end())
@@ -640,7 +646,7 @@ public:
 };
 
 /** Last deferred tablespace with name */
-static deferred_spaces_t deferred_spaces;
+static deferred_spaces_ deferred_spaces;
 
 /** Validate the first page for the tablespace which're recovered
 from redo logs
@@ -704,7 +710,7 @@ tbl_not_found:
 
   fil_node_t *node= space->add(
     f_name.c_str(), OS_FILE_CLOSED, 0, false, false);
-  node->set_deferred(true);
+  node->deferred= true;
   space->recv_size= it->second.size;
   space->size_in_header= size;
   space->free_limit= free_limit;
@@ -714,7 +720,7 @@ tbl_not_found:
   if (!space)
     goto tbl_not_found;
 
-  node->set_deferred(false);
+  node->deferred= false;
   space->release();
   return DB_SUCCESS;
 }
@@ -740,15 +746,20 @@ static dberr_t recv_init_deferred_space(uint32_t space_id,
   return err;
 }
 
-dberr_t deferred_spaces_t::reinit_all()
+/** Reinitialize all deferred tablespace.
+@return DB_SUCCESS if initialization of all deferred
+tablespace went well */
+dberr_t deferred_spaces_::reinit_all()
 {
   for (defer_map::iterator it= defers.begin();
        it != defers.end(); it++)
   {
-    dberr_t err= recv_init_deferred_space(
-      it->first, it->second.file_name);
-    if (err != DB_SUCCESS)
-      return err;
+    if (dberr_t err= recv_init_deferred_space(
+          it->first, it->second.file_name))
+    {
+      if (err != DB_SUCCESS)
+	return err;
+    }
   }
   return DB_SUCCESS;
 }
@@ -957,7 +968,9 @@ inline size_t recv_sys_t::files_size()
 @param[in]	len		length of the file name
 @param[in]	space_id	the tablespace ID
 @param[in]	deleted		whether this is a FILE_DELETE record
-@param[in]	lsn		lsn of the redo log */
+@param[in]	lsn		lsn of the redo log
+@param[in]	store		whether the redo log has to
+				stored */
 static
 void
 fil_name_process(char* name, ulint len, ulint space_id,
@@ -1058,6 +1071,8 @@ same_space:
 			break;
 
 		case FIL_LOAD_DEFER:
+			/** Skip the deferred spaces
+			when lsn is already processed */
 			if (*store != store_t::STORE_IF_EXISTS) {
 				deferred_spaces.add(
 					static_cast<uint32_t>(space_id),
@@ -2269,7 +2284,7 @@ same_page:
           if (!size)
             continue;
         }
-        else if (deferred_spaces.is_exist(space_id));
+        else if (deferred_spaces.find(space_id));
 	else
           continue;
         /* fall through */
@@ -2792,11 +2807,14 @@ inline buf_block_t *recv_sys_t::recover_low(const page_id_t page_id,
     ut_ad(it != recv_spaces.end());
     uint32_t flags= it->second.flags;
     zip_size= fil_space_t::zip_size(flags);
+    block= buf_page_create_deferred(page_id.space(), zip_size,
+                                    &mtr, b);
   }
-
-  block= buf_page_create(
-    space, space ? page_id.page_no(): page_id.space(), zip_size,
-    &mtr, b);
+  else
+  {
+     block= buf_page_create(space, page_id.page_no(), zip_size,
+                            &mtr, b);
+  }
 
   if (UNIV_UNLIKELY(block != b))
   {
@@ -2927,8 +2945,8 @@ void recv_sys_t::apply(bool last_batch)
       ut_ad(!recs.log.empty());
 
       uint32_t space_id= page_id.space();
-      deferred_spaces_t::defer_t *defer_space=
-        deferred_spaces.is_exist(space_id);
+      const deferred_spaces_::defer_ *defer_space=
+        deferred_spaces.find(space_id);
 
       if (defer_space)
       {
@@ -3533,8 +3551,8 @@ next:
 
 		/* Skip the redo logs belongs to deferred
 		tablespace */
-		deferred_spaces_t::defer_t *defer_space=
-		  deferred_spaces.is_exist(static_cast<uint32_t>(space));
+		const deferred_spaces_::defer_ *defer_space=
+		  deferred_spaces.find(static_cast<uint32_t>(space));
 		if (defer_space) {
 			goto next;
 		}
@@ -3569,7 +3587,7 @@ func_exit:
 			continue;
 		}
 
-		if (deferred_spaces.is_exist(
+		if (deferred_spaces.find(
 			static_cast<uint32_t>(rs.first))) {
 			continue;
 		}

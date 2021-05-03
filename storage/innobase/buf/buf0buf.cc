@@ -3258,31 +3258,11 @@ void buf_block_t::initialise(const page_id_t page_id, ulint zip_size,
   page_zip_set_size(&page.zip, zip_size);
 }
 
-/** Initialize a page in the buffer pool. The page is usually not read
-from a file even if it cannot be found in the buffer buf_pool. This is one
-of the functions which perform to a block a state transition NOT_USED =>
-FILE_PAGE (the other is buf_page_get_gen).
-@param[in,out]	space		space object
-@param[in]	offset		offset of the tablespace
-				or deferred space id if space
-				object is null
-@param[in]	zip_size	ROW_FORMAT=COMPRESSED page size, or 0
-@param[in,out]	mtr		mini-transaction
-@param[in,out]	free_block	pre-allocated buffer block
-@return pointer to the block, page bufferfixed */
+static
 buf_block_t*
-buf_page_create(fil_space_t *space, uint32_t offset,
-                ulint zip_size, mtr_t *mtr, buf_block_t *free_block)
+buf_page_create_low(page_id_t page_id, ulint zip_size, mtr_t *mtr,
+                    buf_block_t *free_block)
 {
-  page_id_t page_id;
-  if (space)
-  {
-    page_id.set_page_id(space->id, offset);
-    space->free_page(offset, false);
-  }
-  else
-    page_id.set_page_id(offset, 0);
-
   ut_ad(mtr->is_active());
   ut_ad(page_id.space() != 0 || !zip_size);
 
@@ -3447,6 +3427,43 @@ loop:
   if (!(++buf_dbg_counter % 5771)) buf_pool.validate();
 #endif /* UNIV_DEBUG */
   return block;
+}
+
+/** Initialize a page in the buffer pool. The page is usually not read
+from a file even if it cannot be found in the buffer buf_pool. This is one
+of the functions which perform to a block a state transition NOT_USED =>
+FILE_PAGE (the other is buf_page_get_gen).
+@param[in,out]	space		space object
+@param[in]	offset		offset of the tablespace
+				or deferred space id if space
+				object is null
+@param[in]	zip_size	ROW_FORMAT=COMPRESSED page size, or 0
+@param[in,out]	mtr		mini-transaction
+@param[in,out]	free_block	pre-allocated buffer block
+@return pointer to the block, page bufferfixed */
+buf_block_t*
+buf_page_create(fil_space_t *space, uint32_t offset,
+                ulint zip_size, mtr_t *mtr, buf_block_t *free_block)
+{
+  page_id_t page_id(space->id, offset);
+  space->free_page(offset, false);
+
+  return buf_page_create_low(page_id, zip_size, mtr, free_block);
+}
+
+/** Initialize a page in buffer pool while initializing the
+deferred tablespace
+@param space_id		space identfier
+@param zip_size		ROW_FORMAT=COMPRESSED page size or 0
+@param mtr		mini-transaction
+@param free_block 	pre-allocated buffer block
+@return pointer to the block, page bufferfixed */
+buf_block_t*
+buf_page_create_deferred(uint32_t space_id, ulint zip_size, mtr_t *mtr,
+			 buf_block_t *free_block)
+{
+  page_id_t page_id(space_id, 0);
+  return buf_page_create_low(page_id, zip_size, mtr, free_block);
 }
 
 /** Monitor the buffer page read/write activity, and increment corresponding

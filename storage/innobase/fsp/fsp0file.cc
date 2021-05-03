@@ -489,7 +489,7 @@ err_exit:
 			if (recv_recovery_is_on()
 			    || srv_operation == SRV_OPERATION_BACKUP) {
 				free_first_page();
-				set_defer();
+				m_defer= true;
 				return DB_SUCCESS;
 			}
 			error_txt = "Header page consists of zero bytes";

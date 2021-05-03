@@ -3341,7 +3341,7 @@ static void xb_load_single_table_tablespace(const char *dirname,
 	for (int i = 0; i < 10; i++) {
 		err = file->validate_first_page(&flush_lsn);
 
-		if (file->is_defer()) {
+		if (file->m_defer) {
 
 			if (defer_space_id) {
 				defer = true;
@@ -3375,7 +3375,7 @@ static void xb_load_single_table_tablespace(const char *dirname,
 			file->filepath(),
 			skip_node_page0 ? file->detach() : pfs_os_file_t(),
 			0, false, false);
-		node->set_deferred(defer);
+		node->deferred= defer;
 		mysql_mutex_lock(&fil_system.mutex);
 		space->read_page0();
 		mysql_mutex_unlock(&fil_system.mutex);

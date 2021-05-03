@@ -4501,7 +4501,7 @@ bool fil_node_t::read_page0()
     return false;
   }
 
-  if (!is_deferred())
+  if (!deferred)
   {
     page_t *page= static_cast<byte*>(aligned_malloc(psize, psize));
     if (os_file_read(IORequestRead, handle, page, 0, psize)

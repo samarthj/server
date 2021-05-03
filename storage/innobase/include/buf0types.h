@@ -100,7 +100,6 @@ class page_id_t
 {
 public:
 
-  page_id_t() {}
   /** Constructor from (space, page_no).
   @param[in]	space	tablespace id
   @param[in]	page_no	page number */
@@ -155,13 +154,6 @@ public:
 
   ulonglong raw() { return m_id; }
 
-  /** Reset the page id
-  @param space		tablespace id
-  @param page_no	page number */
-  void set_page_id(ulint space, uint32_t page_no)
-  {
-    m_id= uint64_t{space} << 32 | page_no;
-  }
 private:
   /** The page identifier */
   uint64_t m_id;

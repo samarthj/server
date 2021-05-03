@@ -2622,7 +2622,7 @@ fil_ibd_load(
 	switch (file.validate_for_recovery()) {
 		os_offset_t	minimum_size;
 	case DB_SUCCESS:
-		deferred_space = file.is_defer();
+		deferred_space = file.m_defer;
 
 		if (deferred_space) {
 			goto tablespace_check;

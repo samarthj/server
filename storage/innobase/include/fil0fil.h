@@ -1092,7 +1092,7 @@ struct fil_node_t final
 
 	/** Deferring the tablespace during recovery and it
 	can be used to skip the validation of page0 */
-	bool		deferred;
+	bool		deferred=false;
 
 	/** FIL_NODE_MAGIC_N */
 	ulint		magic_n;
@@ -1127,12 +1127,6 @@ struct fil_node_t final
   /** Update the data structures on write completion */
   inline void complete_write();
 
-  /**  Mark the tablespace file as deferred/undeferred */
-  void set_deferred(bool val) { deferred= val; }
-
-  /** @retval whether the tablespace is deferred */
-  bool is_deferred() const { return deferred; }
-
 private:
   /** Does stuff common for close() and detach() */
   void prepare_to_close_or_detach();
@@ -1159,11 +1153,7 @@ inline bool fil_space_t::is_rotational() const
 
 inline bool fil_space_t::is_deferred() const
 {
-  for (const fil_node_t *node= UT_LIST_GET_FIRST(chain); node;
-       node= UT_LIST_GET_NEXT(chain, node))
-    if (node->is_deferred())
-      return true;
-  return false;
+  return UT_LIST_GET_FIRST(chain)->deferred;
 }
 
 /** Common InnoDB file extensions */
