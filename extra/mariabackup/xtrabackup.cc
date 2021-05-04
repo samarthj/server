@@ -2722,6 +2722,7 @@ xb_get_copy_action(const char *dflt)
 	return(action);
 }
 
+
 /** Copy innodb data file to the specified destination.
 
 @param[in] node	file node of a tablespace
@@ -3454,12 +3455,11 @@ static dberr_t enumerate_ibd_files(process_single_tablespace_func_t callback)
 
 		/* General tablespaces are always at the first level of the
 		data home dir */
-		if (dbinfo.type == OS_FILE_TYPE_FILE) {
-			bool is_isl = ends_with(dbinfo.name, ".isl");
-			bool is_ibd = !is_isl && ends_with(dbinfo.name,".ibd");
-
-			if (is_isl || is_ibd) {
-				(*callback)(NULL, dbinfo.name, is_isl, false, 0);
+		if (dbinfo.type != OS_FILE_TYPE_FILE) {
+			const bool is_isl = ends_with(dbinfo.name, ".isl");
+			if (is_isl || ends_with(dbinfo.name,".ibd")) {
+				(*callback)(nullptr, dbinfo.name, is_isl,
+					    false, 0);
 			}
 		}
 
@@ -4575,6 +4575,7 @@ fail_before_log_copying_thread_start:
 	return(true);
 }
 
+
 /**
 This function handles DDL changes at the end of backup, under protection of
 FTWRL.  This ensures consistent backup in presence of DDL.
@@ -4690,14 +4691,11 @@ void backup_fix_ddl(CorruptedPages &corrupted_pages)
 
 	DBUG_EXECUTE_IF("check_mdl_lock_works", DBUG_ASSERT(new_tables.size() == 0););
 
-	for(space_id_to_name_t::iterator iter = new_tables.begin();
-	    iter != new_tables.end(); iter++) {
-		const char *space_name = iter->second.c_str();
-		if (check_if_skip_table(space_name))
-			continue;
-
-		xb_load_single_table_tablespace(
-			iter->second, false, iter->first);
+	for (auto t : new_tables) {
+		if (!check_if_skip_table(t.second.c_str())) {
+			xb_load_single_table_tablespace(t.second, false,
+							t.first);
+		}
 	}
 
 	datafiles_iter_t it2;

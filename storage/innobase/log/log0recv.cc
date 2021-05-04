@@ -528,6 +528,7 @@ inline size_t log_phys_t::alloc_size(size_t len)
   return len + (1 + 2 + sizeof(log_phys_t));
 }
 
+
 /** Tablespace item during recovery */
 struct file_name_t {
 	/** Tablespace file name (FILE_MODIFY) */
@@ -594,7 +595,10 @@ public:
   /** Maintains the last opened defer file name along with lsn */
   struct defer_
   {
+    /** Log sequence number of latest deferred_spaces.add()
+    called by fil_name_process() */
     lsn_t lsn;
+    /** File name from the FILE_ record */
     std::string file_name;
   };
 private:
@@ -607,21 +611,16 @@ public:
   /** Add the deferred space only if it is latest one
   @param space  space identifier
   @param f_name	file name
-  @param lsn	log sequence number
-  @return true if is inserted successfully */
-  bool add(uint32_t space, std::string f_name, lsn_t lsn)
+  @param lsn	log sequence number */
+  void add(uint32_t space, const std::string &f_name, lsn_t lsn)
   {
-    char *fil_path= fil_make_filepath(
-      NULL, {f_name.c_str(), strlen(f_name.c_str())},
-      IBD, false);
+    char *fil_path= fil_make_filepath(nullptr, {f_name.data(), f_name.size()},
+                                      IBD, false);
     const defer_ defer= {lsn, fil_path};
-    std::pair<defer_map::iterator, bool> p= defers.insert(
-      defer_map::value_type(space, defer));
+    auto p= defers.emplace(space, defer);
+    if (!p.second && p.first->second.lsn <= defer.lsn)
+      p.first->second= defer;
     ut_free(fil_path);
-    if (p.second) return true;
-    if (p.first->second.lsn > defer.lsn) return false;
-    p.first->second= defer;
-    return true;
   }
 
   /** Remove the deferred space */
@@ -651,18 +650,15 @@ static deferred_spaces_ deferred_spaces;
 /** Validate the first page for the tablespace which're recovered
 from redo logs
 @param f_block first block of tablespace
-@return DB_SUCCESS if validation successfully. */
-static dberr_t
-recv_validate_deferred_fpage(buf_block_t *f_block)
+@return whether the page is valid */
+static bool recv_validate_deferred_fpage(const buf_block_t &f_block)
 {
-  ut_ad(f_block);
-  byte *f_page= UNIV_LIKELY_NULL(f_block->page.zip.data)
-    ? f_block->page.zip.data
-    : f_block->frame;
+  const byte *f_page= UNIV_LIKELY_NULL(f_block.page.zip.data)
+    ? f_block.page.zip.data
+    : f_block.frame;
 
-  if (buf_is_zeroes(span<const byte> (f_page, srv_page_size)))
-err_exit:
-    return DB_CORRUPTION;
+  if (buf_is_zeroes(span<const byte>(f_page, f_block.physical_size())))
+    return false;
 
   uint32_t space_id= mach_read_from_4(f_page + FIL_PAGE_SPACE_ID);
   uint32_t flags= fsp_header_get_flags(f_page);
@@ -671,23 +667,19 @@ err_exit:
   auto it= recv_spaces.find(space_id);
   ut_ad(it != recv_spaces.end());
 
-  if (space_id >= SRV_SPACE_ID_UPPER_BOUND
-      || page_no > 0
-      || flags != it->second.flags
-      || !fil_space_t::is_valid_flags(flags, space_id)
-      || fil_space_t::logical_size(flags) != srv_page_size)
-    goto err_exit;
-
-  return DB_SUCCESS;
+  return !page_no && space_id <= SRV_SPACE_ID_UPPER_BOUND &&
+          it != recv_spaces.end() && flags == it->second.flags &&
+          fil_space_t::is_valid_flags(flags, space_id) &&
+          fil_space_t::logical_size(flags) == srv_page_size;
 }
 
 /** Create a deferred tablespace based on page 0 block.
-@param f_block	first block recovered from redo log
-@param f_name	latest file name to be identified from deferred
-		tablespace
+@param f_block  first block recovered from redo log
+@param f_name   latest file name to be identified from deferred
+                tablespace
 @return DB_SUCCESS if it is successful */
 static dberr_t recv_create_deferred_space(buf_block_t *f_block,
-                                          std::string f_name)
+                                          const std::string &f_name)
 {
   byte *page= UNIV_LIKELY_NULL(f_block->page.zip.data)
     ? f_block->page.zip.data
@@ -730,18 +722,15 @@ tbl_not_found:
 @param f_name lastly identified file name in deferred tablespace
 @return DB_SUCCESS if initialization went well */
 static dberr_t recv_init_deferred_space(uint32_t space_id,
-                                        std::string f_name)
+                                        const std::string &f_name)
 {
-  page_id_t f_page_id(space_id, 0);
-  buf_block_t *f_block= recv_sys.recover(f_page_id);
+  buf_block_t *f_block= recv_sys.recover({space_id, 0});
   if (!f_block)
     return DB_CORRUPTION;
-  dberr_t err= recv_validate_deferred_fpage(f_block);
-  if (err != DB_SUCCESS)
-    return err;
-  err= recv_create_deferred_space(f_block, f_name);
+  dberr_t err= recv_validate_deferred_fpage(*f_block)
+    ? recv_create_deferred_space(f_block, f_name)
+    : DB_CORRUPTION;
   deferred_spaces.remove(space_id);
-  /* Unfix the block after creating deferred space */
   f_block->unfix();
   return err;
 }
@@ -751,16 +740,9 @@ static dberr_t recv_init_deferred_space(uint32_t space_id,
 tablespace went well */
 dberr_t deferred_spaces_::reinit_all()
 {
-  for (defer_map::iterator it= defers.begin();
-       it != defers.end(); it++)
-  {
-    if (dberr_t err= recv_init_deferred_space(
-          it->first, it->second.file_name))
-    {
-      if (err != DB_SUCCESS)
-	return err;
-    }
-  }
+  for (auto d : defers)
+    if (dberr_t err= recv_init_deferred_space(d.first, d.second.file_name))
+      return err;
   return DB_SUCCESS;
 }
 
@@ -2284,8 +2266,7 @@ same_page:
           if (!size)
             continue;
         }
-        else if (deferred_spaces.find(space_id));
-	else
+        else if (!deferred_spaces.find(space_id))
           continue;
         /* fall through */
       case STORE_YES:
@@ -2396,7 +2377,7 @@ same_page:
         const_cast<char&>(fn[rlen])= '\0';
         fil_name_process(const_cast<char*>(fn), fnend - fn, space_id,
                          (b & 0xf0) == FILE_DELETE, start_lsn,
-			 store);
+                         store);
         if (fn2)
           fil_name_process(const_cast<char*>(fn2), fn2end - fn2, space_id,
                            false, start_lsn, store);
@@ -3983,14 +3964,10 @@ completed:
 
 	recv_lsn_checks_on = true;
 
-	/* Re-create all deferred tablespace */
-	deferred_spaces.reinit_all();
-
 	/* The database is now ready to start almost normal processing of user
 	transactions: transaction rollbacks and the application of the log
 	records in the hash table can be run in background. */
-
-	return(DB_SUCCESS);
+	return deferred_spaces.reinit_all();
 }
 
 bool recv_dblwr_t::validate_page(const page_id_t page_id,
