@@ -1509,11 +1509,7 @@ file_checked:
 				fil_system.sys_space->size_in_header
 					= uint32_t(size);
 				mtr.commit();
-				/* Immediately write the log record about
-				increased tablespace size to disk, so that it
-				is durable even if mysqld would crash
-				quickly */
-				log_buffer_flush_to_disk();
+				log_write_up_to(mtr.commit_lsn(), true);
 			}
 		}
 
@@ -1769,13 +1765,6 @@ file_checked:
 			row_merge_drop_temp_indexes();
 			/* Drop garbage tables. */
 			row_mysql_drop_garbage_tables();
-
-			/* Drop any auxiliary tables that were not
-			dropped when the parent table was
-			dropped. This can happen if the parent table
-			was dropped but the server crashed before the
-			auxiliary tables were dropped. */
-			fts_drop_orphaned_tables();
 
 			/* Rollback incomplete non-DDL transactions */
 			trx_rollback_is_active = true;

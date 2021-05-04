@@ -2303,9 +2303,7 @@ row_create_table_for_mysql(
 	dict_table_t*	table,	/*!< in, own: table definition
 				(will be freed, or on DB_SUCCESS
 				added to the data dictionary cache) */
-	trx_t*		trx,	/*!< in/out: transaction */
-	fil_encryption_t mode,	/*!< in: encryption mode */
-	uint32_t	key_id)	/*!< in: encryption key_id */
+	trx_t*		trx)	/*!< in/out: transaction */
 {
 	tab_node_t*	node;
 	mem_heap_t*	heap;
@@ -2343,19 +2341,9 @@ err_exit:
 
 	heap = mem_heap_create(512);
 
-	switch (trx_get_dict_operation(trx)) {
-	case TRX_DICT_OP_NONE:
-		trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
-	case TRX_DICT_OP_TABLE:
-		break;
-	case TRX_DICT_OP_INDEX:
-		/* If the transaction was previously flagged as
-		TRX_DICT_OP_INDEX, we should be creating auxiliary
-		tables for full-text indexes. */
-		ut_ad(strstr(table->name.m_name, "/FTS_") != NULL);
-	}
+	trx->dict_operation = true;
 
-	node = tab_create_graph_create(table, heap, mode, key_id);
+	node = tab_create_graph_create(table, heap);
 
 	thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 
@@ -2366,45 +2354,10 @@ err_exit:
 
 	err = trx->error_state;
 
-	switch (err) {
-	case DB_SUCCESS:
-		break;
-	case DB_OUT_OF_FILE_SPACE:
-		trx->error_state = DB_SUCCESS;
-		trx->rollback();
-
-		ib::warn() << "Cannot create table "
-			<< table->name
-			<< " because tablespace full";
-
-		if (dict_table_open_on_name(table->name.m_name, TRUE, FALSE,
-					    DICT_ERR_IGNORE_NONE)) {
-
-			dict_table_close_and_drop(trx, table);
-		} else {
-			dict_mem_table_free(table);
-		}
-
-		break;
-
-	case DB_UNSUPPORTED:
-	case DB_TOO_MANY_CONCURRENT_TRXS:
-		/* We already have .ibd file here. it should be deleted. */
-
-		if (dict_table_is_file_per_table(table)
-		    && fil_delete_tablespace(table->space_id) != DB_SUCCESS) {
-			ib::error() << "Cannot delete the file of table "
-				<< table->name;
-		}
-		/* fall through */
-
-	case DB_DUPLICATE_KEY:
-	case DB_TABLESPACE_EXISTS:
-	default:
+	if (err != DB_SUCCESS) {
 		trx->error_state = DB_SUCCESS;
 		trx->rollback();
 		dict_mem_table_free(table);
-		break;
 	}
 
 	que_graph_free((que_t*) que_node_get_parent(thr));
@@ -2424,12 +2377,14 @@ row_create_index_for_mysql(
 	dict_index_t*	index,		/*!< in, own: index definition
 					(will be freed) */
 	trx_t*		trx,		/*!< in: transaction handle */
-	const ulint*	field_lengths)	/*!< in: if not NULL, must contain
+	const ulint*	field_lengths,	/*!< in: if not NULL, must contain
 					dict_index_get_n_fields(index)
 					actual field lengths for the
 					index columns, which are
 					then checked for not being too
 					large. */
+	fil_encryption_t mode,		/*!< in: encryption mode */
+	uint32_t	key_id)		/*!< in: encryption key_id */
 {
 	ind_node_t*	node;
 	mem_heap_t*	heap;
@@ -2470,14 +2425,14 @@ row_create_index_for_mysql(
 	just updates dictonary cache. */
 	if (!table->is_temporary()) {
 		trx_start_if_not_started_xa(trx, true);
-		trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
+		trx->dict_operation = true;
 		/* Note that the space id where we store the index is
 		inherited from the table in dict_build_index_def_step()
 		in dict0crea.cc. */
 
 		heap = mem_heap_create(512);
 		node = ind_create_graph_create(index, table->name.m_name,
-					       heap);
+					       heap, mode, key_id);
 
 		thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 
@@ -2837,7 +2792,7 @@ row_discard_tablespace_begin(
 {
 	trx->op_info = "discarding tablespace";
 
-	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
+	trx->dict_operation = true;
 
 	trx_start_if_not_started_xa(trx, true);
 
@@ -3335,7 +3290,7 @@ row_drop_table_for_mysql(
 
 	/* This function is called recursively via fts_drop_tables(). */
 	if (!trx_is_started(trx)) {
-		trx_start_for_ddl(trx, TRX_DICT_OP_TABLE);
+		trx_start_for_ddl(trx);
 	}
 
 	/* Turn on this drop bit before we could release the dictionary
@@ -3502,18 +3457,7 @@ defer:
 	and it is free to be dropped */
 	table->to_be_dropped = false;
 
-	switch (trx_get_dict_operation(trx)) {
-	case TRX_DICT_OP_NONE:
-		trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
-		trx->table_id = table->id;
-	case TRX_DICT_OP_TABLE:
-		break;
-	case TRX_DICT_OP_INDEX:
-		/* If the transaction was previously flagged as
-		TRX_DICT_OP_INDEX, we should be dropping auxiliary
-		tables for full-text indexes. */
-		ut_ad(strstr(table->name.m_name, "/FTS_"));
-	}
+	trx->dict_operation = true;
 
 	/* Mark all indexes unavailable in the data dictionary cache
 	before starting to drop the table. */
@@ -3872,7 +3816,7 @@ row_drop_database_for_mysql(
 
 	*found = 0;
 
-	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
+	trx->dict_operation = true;
 
 	trx_start_if_not_started_xa(trx, true);
 

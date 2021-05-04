@@ -2653,7 +2653,7 @@ ha_innobase::update_thd(
 	trx_t*	trx = check_trx_exists(thd);
 
 	ut_ad(trx->dict_operation_lock_mode == 0);
-	ut_ad(trx->dict_operation == TRX_DICT_OP_NONE);
+	ut_ad(!trx->dict_operation);
 
 	if (m_prebuilt->trx != trx) {
 
@@ -4057,7 +4057,7 @@ innobase_commit(
 	trx_t*	trx = check_trx_exists(thd);
 
 	ut_ad(trx->dict_operation_lock_mode == 0);
-	ut_ad(trx->dict_operation == TRX_DICT_OP_NONE);
+	ut_ad(!trx->dict_operation);
 
 	/* Transaction is deregistered only in a commit or a rollback. If
 	it is deregistered we know there cannot be resources to be freed
@@ -4146,7 +4146,7 @@ innobase_rollback(
 	trx_t*	trx = check_trx_exists(thd);
 
 	ut_ad(trx->dict_operation_lock_mode == 0);
-	ut_ad(trx->dict_operation == TRX_DICT_OP_NONE);
+	ut_ad(!trx->dict_operation);
 
 	/* Reset the number AUTO-INC rows required */
 
@@ -10392,8 +10392,7 @@ err_col:
 					    "temporary table creation.");
 		}
 
-		m_trx->table_id = table->id
-			= dict_sys.get_temporary_table_id();
+		table->id = dict_sys.get_temporary_table_id();
 		ut_ad(dict_tf_get_rec_format(table->flags)
 		      != REC_FORMAT_COMPRESSED);
 		table->space_id = SRV_TMP_SPACE_ID;
@@ -10401,19 +10400,13 @@ err_col:
 		table->add_to_cache();
 	} else {
 		if (err == DB_SUCCESS) {
-			err = row_create_table_for_mysql(
-				table, m_trx,
-				fil_encryption_t(options->encryption),
-				uint32_t(options->encryption_key_id));
+			err = row_create_table_for_mysql(table, m_trx);
 			m_drop_before_rollback = (err == DB_SUCCESS);
 		}
 
 		DBUG_EXECUTE_IF("ib_crash_during_create_for_encryption",
 				DBUG_SUICIDE(););
 	}
-
-	DBUG_EXECUTE_IF("ib_create_err_tablespace_exist",
-			err = DB_TABLESPACE_EXISTS;);
 
 	switch (err) {
 	case DB_SUCCESS:
@@ -10423,7 +10416,6 @@ err_col:
 	default:
 		break;
 	case DB_DUPLICATE_KEY:
-	case DB_TABLESPACE_EXISTS:
 		char display_name[FN_REFLEN];
 		char* buf_end = innobase_convert_identifier(
 			display_name, sizeof(display_name) - 1,
@@ -10432,9 +10424,7 @@ err_col:
 
 		*buf_end = '\0';
 
-		my_error(err == DB_DUPLICATE_KEY
-			 ? ER_TABLE_EXISTS_ERROR
-			 : ER_TABLESPACE_EXISTS, MYF(0), display_name);
+		my_error(ER_TABLE_EXISTS_ERROR, MYF(0), display_name);
 	}
 
 	DBUG_RETURN(convert_error_code_to_mysql(err, m_flags, m_thd));
@@ -10463,6 +10453,7 @@ create_index(
 
 	/* Assert that "GEN_CLUST_INDEX" cannot be used as non-primary index */
 	ut_a(innobase_strcasecmp(key->name.str, innobase_index_reserve_name) != 0);
+	const ha_table_option_struct& o = *form->s->option_struct;
 
 	if (key->flags & (HA_SPATIAL | HA_FULLTEXT)) {
 		/* Only one of these can be specified at a time. */
@@ -10489,7 +10480,9 @@ create_index(
 
 		DBUG_RETURN(convert_error_code_to_mysql(
 				    row_create_index_for_mysql(
-					    index, trx, NULL),
+					    index, trx, NULL,
+					    fil_encryption_t(o.encryption),
+					    uint32_t(o.encryption_key_id)),
 				    table->flags, NULL));
 	}
 
@@ -10585,7 +10578,9 @@ create_index(
 	ulint flags = table->flags;
 
 	error = convert_error_code_to_mysql(
-		row_create_index_for_mysql(index, trx, field_lengths),
+		row_create_index_for_mysql(index, trx, field_lengths,
+					   fil_encryption_t(o.encryption),
+					   uint32_t(o.encryption_key_id)),
 		flags, NULL);
 
 	my_free(field_lengths);
@@ -12185,7 +12180,7 @@ create_table_info_t::create_foreign_keys()
 
 	trx_start_if_not_started_xa(m_trx, true);
 
-	trx_set_dict_operation(m_trx, TRX_DICT_OP_TABLE);
+	m_trx->dict_operation = true;
 
 	error = dict_create_add_foreigns_to_dictionary(local_fk_set, table,
 						       m_trx);
@@ -12240,8 +12235,12 @@ int create_table_info_t::create_table(bool create_fk)
 		dict_index_t* index = dict_mem_index_create(
 			m_table, innobase_index_reserve_name,
 			DICT_CLUSTERED, 0);
+		const ha_table_option_struct& o = *m_form->s->option_struct;
 		error = convert_error_code_to_mysql(
-			row_create_index_for_mysql(index, m_trx, NULL),
+			row_create_index_for_mysql(
+				index, m_trx, NULL,
+				fil_encryption_t(o.encryption),
+				uint32_t(o.encryption_key_id)),
 			flags, m_thd);
 		if (error) {
 			DBUG_RETURN(error);
@@ -12712,8 +12711,7 @@ create_table_info_t::allocate_trx()
 {
 	m_trx = innobase_trx_allocate(m_thd);
 
-	m_trx->will_lock++;
-	m_trx->ddl = true;
+	m_trx->will_lock = 1;
 }
 
 /** Create a new table to an InnoDB database.
@@ -12731,7 +12729,6 @@ ha_innobase::create(
 	bool		file_per_table,
 	trx_t*		trx)
 {
-	int		error;
 	char		norm_name[FN_REFLEN];	/* {database}/{tablename} */
 	char		remote_path[FN_REFLEN];	/* Absolute path of table */
 
@@ -12748,13 +12745,18 @@ ha_innobase::create(
 				     remote_path,
 				     file_per_table, trx);
 
-	if ((error = info.initialize())
-	    || (error = info.prepare_create_table(name, !trx))) {
-		if (trx) {
-			trx_rollback_for_mysql(trx);
-			row_mysql_unlock_data_dictionary(trx);
+	{
+		int error = info.initialize();
+		if (!error) {
+			error = info.prepare_create_table(name, !trx);
 		}
-		DBUG_RETURN(error);
+		if (error) {
+			if (trx) {
+				trx_rollback_for_mysql(trx);
+				row_mysql_unlock_data_dictionary(trx);
+			}
+			DBUG_RETURN(error);
+		}
 	}
 
 	const bool own_trx = !trx;
@@ -12769,7 +12771,7 @@ ha_innobase::create(
 		DBUG_ASSERT(trx_state_eq(trx, TRX_STATE_NOT_STARTED));
 	}
 
-	if ((error = info.create_table(own_trx))) {
+	if (int error = info.create_table(own_trx)) {
 		/* Drop the being-created table before rollback,
 		so that rollback can possibly rename back a table
 		that could have been renamed before the failed creation. */
@@ -12794,16 +12796,9 @@ ha_innobase::create(
 		trx->free();
 	}
 
-	/* Flush the log to reduce probability that the .frm files and
-	the InnoDB data dictionary get out-of-sync if the user runs
-	with innodb_flush_log_at_trx_commit = 0 */
-	log_buffer_flush_to_disk();
-
 	ut_ad(!srv_read_only_mode);
 
-	error = info.create_table_update_dict();
-
-	DBUG_RETURN(error);
+	DBUG_RETURN(info.create_table_update_dict());
 }
 
 /** Create a new table to an InnoDB database.
@@ -13134,11 +13129,6 @@ inline int ha_innobase::delete_table(const char* name, enum_sql_command sqlcom)
 	}
 
 	ut_ad(!srv_read_only_mode);
-	/* Flush the log to reduce probability that the .frm files and
-	the InnoDB data dictionary get out-of-sync if the user runs
-	with innodb_flush_log_at_trx_commit = 0 */
-
-	log_buffer_flush_to_disk();
 
 	innobase_commit_low(trx);
 
@@ -13234,12 +13224,6 @@ innobase_drop_database(
 
 	my_free(namebuf);
 
-	/* Flush the log to reduce probability that the .frm files and
-	the InnoDB data dictionary get out-of-sync if the user runs
-	with innodb_flush_log_at_trx_commit = 0 */
-
-	log_buffer_flush_to_disk();
-
 	innobase_commit_low(trx);
 
 	trx->free();
@@ -13259,8 +13243,7 @@ inline dberr_t innobase_rename_table(trx_t *trx, const char *from,
 	char	norm_from[FN_REFLEN];
 
 	DBUG_ENTER("innobase_rename_table");
-	DBUG_ASSERT(trx_get_dict_operation(trx) == TRX_DICT_OP_INDEX
-		    || trx_get_dict_operation(trx) == TRX_DICT_OP_TABLE);
+	DBUG_ASSERT(trx->dict_operation);
 
 	ut_ad(!srv_read_only_mode);
 
@@ -13333,12 +13316,6 @@ inline dberr_t innobase_rename_table(trx_t *trx, const char *from,
 		row_mysql_unlock_data_dictionary(trx);
 	}
 
-	/* Flush the log to reduce probability that the .frm
-	files and the InnoDB data dictionary get out-of-sync
-	if the user runs with innodb_flush_log_at_trx_commit = 0 */
-
-	log_buffer_flush_to_disk();
-
 	DBUG_RETURN(error);
 }
 
@@ -13381,8 +13358,8 @@ int ha_innobase::truncate()
 	const char* name = mem_heap_strdup(heap, ib_table->name.m_name);
 	trx_t*	trx = innobase_trx_allocate(m_user_thd);
 
-	++trx->will_lock;
-	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
+	trx->will_lock = 1;
+	trx->dict_operation = true;
 	row_mysql_lock_data_dictionary(trx);
 	dict_stats_wait_bg_to_stop_using_table(ib_table, trx);
 
@@ -13468,8 +13445,8 @@ ha_innobase::rename_table(
 	trx_t*	trx = innobase_trx_allocate(thd);
 
 	/* We are doing a DDL operation. */
-	++trx->will_lock;
-	trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+	trx->will_lock = 1;
+	trx->dict_operation = true;
 
 	dberr_t	error = innobase_rename_table(trx, from, to, true);
 
@@ -20755,10 +20732,7 @@ ib_push_frm_error(
 		sql_print_error("InnoDB: Table %s contains " ULINTPF " "
 			"indexes inside InnoDB, which "
 			"is different from the number of "
-			"indexes %u defined in the MariaDB "
-			" Have you mixed up "
-			".frm files from different "
-			"installations? See "
+			"indexes %u defined in the .frm file. See "
 			"https://mariadb.com/kb/en/innodb-troubleshooting/\n",
 			ib_table->name.m_name, n_keys,
 			table->s->keys);

@@ -1,7 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 1996, 2016, Oracle and/or its affiliates. All Rights Reserved.
-Copyright (c) 2017, 2020, MariaDB Corporation.
+Copyright (c) 2017, 2021, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -41,14 +41,14 @@ tab_create_graph_create(
 /*====================*/
 	dict_table_t*	table,		/*!< in: table to create, built as
 					a memory data structure */
-	mem_heap_t*	heap,		/*!< in: heap where created */
-	fil_encryption_t mode,		/*!< in: encryption mode */
-	uint32_t	key_id);	/*!< in: encryption key_id */
+	mem_heap_t*	heap);		/*!< in: heap where created */
 
 /** Creates an index create graph.
 @param[in]	index	index to create, built as a memory data structure
 @param[in]	table	table name
 @param[in,out]	heap	heap where created
+@param[in]	mode	encryption mode (for creating a table)
+@param[in]	key_id	encryption key identifier (for creating a table)
 @param[in]	add_v	new virtual columns added in the same clause with
 			add index
 @return own: index create node */
@@ -57,6 +57,8 @@ ind_create_graph_create(
 	dict_index_t*		index,
 	const char*		table,
 	mem_heap_t*		heap,
+	fil_encryption_t	mode,
+	uint32_t		key_id,
 	const dict_add_v_col_t*	add_v = NULL);
 
 /***********************************************************//**
@@ -99,9 +101,11 @@ dict_create_index_tree(
 /** Drop the index tree associated with a row in SYS_INDEXES table.
 @param[in,out]	pcur	persistent cursor on rec
 @param[in,out]	trx	dictionary transaction
+@param[in,out]	table	table that the record belongs to
 @param[in,out]	mtr	mini-transaction */
-void dict_drop_index_tree(btr_pcur_t* pcur, trx_t* trx, mtr_t* mtr)
-	MY_ATTRIBUTE((nonnull(1,3)));
+void dict_drop_index_tree(btr_pcur_t *pcur, trx_t *trx, dict_table_t *table,
+                          mtr_t *mtr)
+	MY_ATTRIBUTE((nonnull(1,4)));
 
 /***************************************************************//**
 Creates an index tree for the index if it is not a member of a cluster.
@@ -216,8 +220,6 @@ struct tab_node_t{
 	/* Local storage for this graph node */
 	ulint		state;		/*!< node execution state */
 	ulint		col_no;		/*!< next column definition to insert */
-	uint		key_id;	/*!< encryption key_id */
-	fil_encryption_t mode;	/*!< encryption mode */
 	ulint		base_col_no;	/*!< next base column to insert */
 	mem_heap_t*	heap;		/*!< memory heap used as auxiliary
 					storage */
@@ -249,11 +251,12 @@ struct ind_node_t{
 	/* Local storage for this graph node */
 	ulint		state;		/*!< node execution state */
 	uint32_t	page_no;	/* root page number of the index */
-	dict_table_t*	table;		/*!< table which owns the index */
 	dtuple_t*	ind_row;	/* index definition row built */
 	ulint		field_no;	/* next field definition to insert */
 	mem_heap_t*	heap;		/*!< memory heap used as auxiliary
 					storage */
+	uint		key_id;		/*!< encryption key_id */
+	fil_encryption_t mode;		/*!< encryption mode */
 	const dict_add_v_col_t*
 			add_v;		/*!< new virtual columns that being
 					added along with an add index call */
