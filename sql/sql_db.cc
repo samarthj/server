@@ -43,7 +43,7 @@
 #include <my_dir.h>
 #include <m_ctype.h>
 #include "log.h"
-#ifdef __WIN__
+#ifdef _WIN32
 #include <direct.h>
 #endif
 #include "debug_sync.h"

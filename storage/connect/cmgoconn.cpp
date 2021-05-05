@@ -151,16 +151,16 @@ void CMgoConn::mongo_init(bool init)
 bool CMgoConn::Connect(PGLOBAL g)
 {
 	if (!IsInit)
-#if defined(__WIN__)
+#if defined(_WIN32)
 		__try {
 		  mongo_init(true);
 	  } __except (EXCEPTION_EXECUTE_HANDLER) {
 		  strcpy(g->Message, "Cannot load MongoDB C driver");
 		  return true;
 	  }	// end try/except
-#else   // !__WIN__
+#else   // !_WIN32
 		mongo_init(true);
-#endif  // !__WIN__
+#endif  // !_WIN32
 
 	Uri = mongoc_uri_new(Pcg->Uristr);
 

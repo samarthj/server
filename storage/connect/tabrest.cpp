@@ -19,12 +19,12 @@
 #include "mini-global.h"
 #define _MAX_PATH 260
 #if !defined(REST_SOURCE)
-#if defined(__WIN__) || defined(_WINDOWS)
+#if defined(_WIN32) || defined(_WINDOWS)
 #include <windows.h>
-#else		 // !__WIN__
+#else		 // !_WIN32
 #define __stdcall
 #include <dlfcn.h>         // dlopen(), dlclose(), dlsym() ...
-#endif   // !__WIN__
+#endif   // !_WIN32
 #endif	 // !REST_SOURCE
 #define _OS_H_INCLUDED     // Prevent os.h to be called
 #endif  // !MARIADB
@@ -53,7 +53,7 @@
 #define PUSH_WARNING(M) htrc(M)
 #endif
 
-#if defined(__WIN__) || defined(_WINDOWS)
+#if defined(_WIN32) || defined(_WINDOWS)
 #define popen  _popen
 #define pclose _pclose
 #endif
@@ -134,7 +134,7 @@ XGETREST GetRestFunction(PGLOBAL g)
 	if (trace(515))
 		htrc("Looking for GetRest library\n");
 
-#if defined(__WIN__) || defined(_WINDOWS)
+#if defined(_WIN32) || defined(_WINDOWS)
 	HANDLE Hdll;
 	const char* soname = "GetRest.dll";   // Module name
 
@@ -163,7 +163,7 @@ XGETREST GetRestFunction(PGLOBAL g)
 		FreeLibrary((HMODULE)Hdll);
 		return NULL;
 	} // endif getRestFnc
-#else   // !__WIN__
+#else   // !_WIN32
 	void* Hso;
 	const char* error = NULL;
 	const char* soname = "GetRest.so";   // Module name
@@ -182,7 +182,7 @@ XGETREST GetRestFunction(PGLOBAL g)
 		dlclose(Hso);
 		return NULL;
 	} // endif getdef
-#endif  // !__WIN__
+#endif  // !_WIN32
 #else
 	getRestFnc = restGetFile;
 #endif

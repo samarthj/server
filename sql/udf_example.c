@@ -122,13 +122,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef __WIN__
-typedef unsigned __int64 ulonglong;	/* Microsofts 64 bit types */
-typedef __int64 longlong;
-#else
 typedef unsigned long long ulonglong;
 typedef long long longlong;
-#endif /*__WIN__*/
 #else
 #include "mariadb.h"
 #include <my_sys.h>
@@ -700,7 +695,7 @@ longlong udf_sequence(UDF_INIT *initid __attribute__((unused)), UDF_ARGS *args,
 **
 ****************************************************************************/
 
-#ifdef __WIN__
+#ifdef _WIN32
 #include <winsock2.h>
 #else
 #include <sys/socket.h>

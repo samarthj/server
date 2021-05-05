@@ -32,7 +32,7 @@
 #ifdef	 HAVE_PWD_H
 #include <pwd.h>
 #endif
-#if !defined(__WIN__)
+#if !defined(_WIN32)
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -54,7 +54,7 @@
 extern ulong net_buffer_length;
 extern ulong max_allowed_packet;
 
-#if defined(__WIN__)
+#if defined(_WIN32)
 #define ERRNO WSAGetLastError()
 #define perror(A)
 #else
@@ -67,14 +67,6 @@ extern ulong max_allowed_packet;
 #ifdef HAVE_GETPWUID
 struct passwd *getpwuid(uid_t);
 char* getlogin(void);
-#endif
-
-#ifdef __WIN__
-static my_bool is_NT(void)
-{
-  char *os=getenv("OS");
-  return (os && !strcmp(os, "Windows_NT")) ? 1 : 0;
-}
 #endif
 
 int mysql_init_character_set(MYSQL *mysql);

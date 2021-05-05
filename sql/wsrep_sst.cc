@@ -758,7 +758,7 @@ static size_t estimate_cmd_len (bool* extra_args)
           require text to be enclosed in double quotes:
         */
         if (isspace(c) || c == '\'' || c == '&' || c == '|' ||
-#ifdef __WIN__
+#ifdef _WIN32
                           c == '>'  || c == '<')
 #else
         /*
@@ -793,7 +793,7 @@ static size_t estimate_cmd_len (bool* extra_args)
               require text to be enclosed in double quotes:
             */
             if (isspace(c) || c == '\'' || c == '&' || c == '|' ||
-#ifdef __WIN__
+#ifdef _WIN32
                               c == '>'  || c == '<')
 #else
             /*
@@ -809,7 +809,7 @@ static size_t estimate_cmd_len (bool* extra_args)
               Double quotation mark or backslash symbol requires backslash
               prefixing:
             */
-#ifdef __WIN__
+#ifdef _WIN32
             else if (c == '"' || c == '\\')
 #else
             /*
@@ -828,7 +828,7 @@ static size_t estimate_cmd_len (bool* extra_args)
           Double quotation mark or backslash symbol requires backslash
           prefixing:
         */
-#ifdef __WIN__
+#ifdef _WIN32
         else if (c == '"' || c == '\\')
 #else
         /*
@@ -887,7 +887,7 @@ static void copy_orig_argv (char* cmd_str)
           require text to be enclosed in double quotes:
         */
         if (isspace(c) || c == '\'' || c == '&' || c == '|' ||
-#ifdef __WIN__
+#ifdef _WIN32
                           c == '>'  || c == '<')
 #else
         /*
@@ -933,7 +933,7 @@ static void copy_orig_argv (char* cmd_str)
               while (m)
               {
                 c = *arg++;
-#ifdef __WIN__
+#ifdef _WIN32
                 if (c == '"' || c == '\\')
 #else
                 if (c == '"' || c == '\\' || c == '$')
@@ -973,7 +973,7 @@ static void copy_orig_argv (char* cmd_str)
               require text to be enclosed in double quotes:
             */
             if (isspace(c) || c == '\'' || c == '&' || c == '|' ||
-#ifdef __WIN__
+#ifdef _WIN32
                               c == '>'  || c == '<')
 #else
             /*
@@ -989,7 +989,7 @@ static void copy_orig_argv (char* cmd_str)
               Double quotation mark or backslash symbol requires backslash
               prefixing:
             */
-#ifdef __WIN__
+#ifdef _WIN32
             else if (c == '"' || c == '\\')
 #else
             /*
@@ -1008,7 +1008,7 @@ static void copy_orig_argv (char* cmd_str)
           Double quotation mark or backslash symbol requires backslash
           prefixing:
         */
-#ifdef __WIN__
+#ifdef _WIN32
         else if (c == '"' || c == '\\')
 #else
         /*
@@ -1042,7 +1042,7 @@ static void copy_orig_argv (char* cmd_str)
         {
           while ((c = *arg++) != 0)
           {
-#ifdef __WIN__
+#ifdef _WIN32
             if (c == '"' || c == '\\')
 #else
             if (c == '"' || c == '\\' || c == '$')

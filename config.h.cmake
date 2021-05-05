@@ -428,10 +428,6 @@
 #endif
 #define PSAPI_VERSION 1     /* for GetProcessMemoryInfo() */
 
-/* We don't want the min/max macros */
-#ifdef __WIN__
-#define NOMINMAX 1
-#endif
 
 /*
   MySQL features

@@ -57,7 +57,7 @@
 #include "sql_insert.h"                        // binlog_drop_table
 #include <algorithm>
 
-#ifdef __WIN__
+#ifdef _WIN32
 #include <io.h>
 #endif
 

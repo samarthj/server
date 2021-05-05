@@ -1406,7 +1406,7 @@ struct my_option xb_server_options[] =
    (G_PTR*) &mysql_data_home, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
   {"tmpdir", 't',
    "Path for temporary files. Several paths may be specified, separated by a "
-#if defined(__WIN__) || defined(OS2) || defined(__NETWARE__)
+#if defined(_WIN32)
    "semicolon (;)"
 #else
    "colon (:)"
@@ -1534,7 +1534,7 @@ struct my_option xb_server_options[] =
    &dbug_option, &dbug_option, 0, GET_STR, OPT_ARG,
    0, 0, 0, 0, 0, 0},
 #endif
-#ifndef __WIN__
+#ifndef _WIN32
   {"debug-sync", OPT_XTRA_DEBUG_SYNC,
    "Debug sync point. This is only used by the xtrabackup test suite",
    (G_PTR*) &xtrabackup_debug_sync,
@@ -1622,7 +1622,7 @@ struct my_option xb_server_options[] =
 
 uint xb_server_options_count = array_elements(xb_server_options);
 
-#ifndef __WIN__
+#ifndef _WIN32
 static int debug_sync_resumed;
 
 static void sigcont_handler(int sig);
@@ -1637,7 +1637,7 @@ static inline
 void
 debug_sync_point(const char *name)
 {
-#ifndef __WIN__
+#ifndef _WIN32
 	FILE	*fp;
 	pid_t	pid;
 	char	pid_path[FN_REFLEN];
@@ -6537,7 +6537,7 @@ static int main_low(char** argv)
 	/* get default temporary directory */
 	if (!opt_mysql_tmpdir || !opt_mysql_tmpdir[0]) {
 		opt_mysql_tmpdir = getenv("TMPDIR");
-#if defined(__WIN__)
+#if defined(_WIN32)
 		if (!opt_mysql_tmpdir) {
 			opt_mysql_tmpdir = getenv("TEMP");
 		}
@@ -6646,7 +6646,7 @@ static int main_low(char** argv)
 		}
 	}
 
-#ifndef __WIN__
+#ifndef _WIN32
 	if (xtrabackup_debug_sync) {
 		signal(SIGCONT, sigcont_handler);
 	}

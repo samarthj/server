@@ -18,7 +18,7 @@
 #include "sql_priv.h"
 #include "unireg.h"
 #include <signal.h>
-#ifndef __WIN__
+#ifndef _WIN32
 #include <netdb.h>        // getservbyname, servent
 #endif
 #include "sql_parse.h"    // path_starts_from_data_home_dir
@@ -147,7 +147,7 @@ extern "C" {					// Because of SCO 3.2V4.2
 #endif
 #include <my_net.h>
 
-#if !defined(__WIN__)
+#if !defined(_WIN32)
 #include <sys/resource.h>
 #ifdef HAVE_SYS_UN_H
 #include <sys/un.h>
@@ -159,11 +159,11 @@ extern "C" {					// Because of SCO 3.2V4.2
 #include <sys/select.h>
 #endif
 #include <sys/utsname.h>
-#endif /* __WIN__ */
+#endif /* _WIN32 */
 
 #include <my_libwrap.h>
 
-#ifdef __WIN__ 
+#ifdef _WIN32 
 #include <crtdbg.h>
 #endif
 
@@ -1624,7 +1624,7 @@ static void break_connect_loop()
 #endif
   }
   mysql_mutex_unlock(&LOCK_start_thread);
-#endif /* __WIN__ */
+#endif /* _WIN32 */
 }
 
 
@@ -1771,7 +1771,7 @@ extern "C" sig_handler print_signal_warning(int sig)
 #ifdef SIGNAL_HANDLER_RESET_ON_DELIVERY
   my_sigset(sig,print_signal_warning);		/* int. thread system calls */
 #endif
-#if !defined(__WIN__)
+#if !defined(_WIN32)
   if (sig == SIGALRM)
     alarm(2);					/* reschedule alarm */
 #endif
@@ -2095,7 +2095,7 @@ static void set_ports()
   }
   if (!mysqld_unix_port)
   {
-#ifdef __WIN__
+#ifdef _WIN32
     mysqld_unix_port= (char*) MYSQL_NAMEDPIPE;
 #else
     mysqld_unix_port= (char*) MYSQL_UNIX_ADDR;
@@ -2154,7 +2154,7 @@ static void set_user(const char *user, struct passwd *user_info_arg)
   allow_coredumps();
 }
 
-#if !defined(__WIN__)
+#if !defined(_WIN32)
 static void set_effective_user(struct passwd *user_info_arg)
 {
   DBUG_ASSERT(user_info_arg != 0);
@@ -2175,7 +2175,7 @@ static void set_effective_user(struct passwd *user_info_arg)
 /** Change root user if started with @c --chroot . */
 static void set_root(const char *path)
 {
-#if !defined(__WIN__)
+#if !defined(_WIN32)
   if (chroot(path) == -1)
   {
     sql_perror("chroot");
@@ -2258,7 +2258,7 @@ static void activate_tcp_port(uint port,
 
       mysql_socket_set_thread_owner(ip_sock);
 
-#ifndef __WIN__
+#ifndef _WIN32
       /*
         We should not use SO_REUSEADDR on windows as this would enable a
         user to open two mysqld servers with the same TCP/IP port.
@@ -2266,7 +2266,7 @@ static void activate_tcp_port(uint port,
       arg= 1;
       (void) mysql_socket_setsockopt(ip_sock, SOL_SOCKET, SO_REUSEADDR,
                                      (char*)&arg, sizeof(arg));
-#endif /* __WIN__ */
+#endif /* _WIN32 */
 
 #ifdef IPV6_V6ONLY
       /*
@@ -2884,7 +2884,7 @@ static void start_signal_handler(void)
 static void check_data_home(const char *path)
 {}
 
-#endif /* __WIN__ */
+#endif /* _WIN32 */
 
 
 #if BACKTRACE_DEMANGLE
@@ -2911,7 +2911,7 @@ mariadb_dbug_assert_failed(const char *assert_expr, const char *file,
 }
 #endif /* DBUG_ASSERT_AS_PRINT */
 
-#if !defined(__WIN__)
+#if !defined(_WIN32)
 #ifndef SA_RESETHAND
 #define SA_RESETHAND 0
 #endif /* SA_RESETHAND */
@@ -3177,7 +3177,7 @@ static void check_data_home(const char *path)
 {}
 
 #endif /*!EMBEDDED_LIBRARY*/
-#endif	/* __WIN__*/
+#endif	/* _WIN32*/
 
 
 /**
@@ -3977,7 +3977,7 @@ static int init_common_variables()
     /* MyISAM requires two file handles per table. */
     wanted_files= (extra_files + max_connections + extra_max_connections +
                    tc_size * 2 * tc_instances);
-#if defined(HAVE_POOL_OF_THREADS) && !defined(__WIN__)
+#if defined(HAVE_POOL_OF_THREADS) && !defined(_WIN32)
     // add epoll or kevent fd for each threadpool group, in case pool of threads is used
     wanted_files+= (thread_handling > SCHEDULER_NO_THREADS) ? 0 : threadpool_size;
 #endif
@@ -6578,7 +6578,7 @@ struct my_option my_long_options[]=
    &opt_use_ssl, &opt_use_ssl, 0, GET_BOOL, OPT_ARG, 0, 0, 0,
    0, 0, 0},
 #endif
-#ifdef __WIN__
+#ifdef _WIN32
   {"standalone", 0,
   "Dummy option to start as a standalone program (NT).", 0, 0, 0, GET_NO_ARG,
    NO_ARG, 0, 0, 0, 0, 0, 0},
@@ -7499,7 +7499,7 @@ static void usage(void)
     puts("\nFor more help options (several pages), use mysqld --verbose --help.");
   else
   {
-#ifdef __WIN__
+#ifdef _WIN32
   puts("NT and Win32 specific options:\n"
        "  --install                     Install the default service (NT).\n"
        "  --install-manual              Install the default service started manually (NT).\n"
@@ -7715,7 +7715,7 @@ static int mysql_init_variables(void)
 #endif /* ! EMBEDDED_LIBRARY */
 #endif /* HAVE_OPENSSL */
 
-#if defined(__WIN__)
+#if defined(_WIN32)
   /* Allow Win32 users to move MySQL anywhere */
   {
     char prg_dev[LIBLEN];
