@@ -1750,7 +1750,7 @@ public:
     *this= *state;
   }
 
-  void reset_open_tables_state(THD *thd)
+  void reset_open_tables_state()
   {
     open_tables= 0;
     temporary_tables= 0;
