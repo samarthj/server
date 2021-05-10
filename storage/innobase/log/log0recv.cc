@@ -755,6 +755,11 @@ static dberr_t recv_init_deferred_space(uint32_t space_id,
       : DB_CORRUPTION;
     f_block->unfix();
   }
+  else
+  {
+    /* FIXME: Also delete .isl file */
+    os_file_delete_if_exists(innodb_data_file_key, f_name.c_str(), nullptr);
+  }
   return err;
 }
 

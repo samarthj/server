@@ -291,7 +291,8 @@ call mtr.add_suppression("InnoDB indexes are inconsistent with what defined in \
 call mtr.add_suppression("InnoDB could not find key no [01] with name [ab] from dict cache for table test/t[123]");
 call mtr.add_suppression("InnoDB: Table test/t[123] contains .* indexes inside InnoDB");
 call mtr.add_suppression("InnoDB: Table `test`\\.`t3` does not exist");
---remove_files_wildcard $datadir/test #sql-alter-*.ibd
+# MDEV-24626 FIXME: a 0-sized file will not be deleted!
+--list_files $datadir/test #sql-alter-*.ibd
 
 # Some errors are reported despite the MDEV-24626 fix.
 call mtr.add_suppression("InnoDB: Cannot (read first page of|open datafile for read-only:) '\\./test/(FTS_|#sql-(alter|backup)-).*\\.ibd'");
