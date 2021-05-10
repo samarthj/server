@@ -9143,6 +9143,7 @@ void TABLE_LIST::set_lock_type(THD *thd, enum thr_lock_type lock)
   }
 }
 
+
 bool TABLE_LIST::is_with_table()
 {
   return derived && derived->with_element;
