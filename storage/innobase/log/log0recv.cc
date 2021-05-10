@@ -747,14 +747,14 @@ tbl_not_found:
 static dberr_t recv_init_deferred_space(uint32_t space_id,
                                         const std::string &f_name)
 {
-  buf_block_t *f_block= recv_sys.recover({space_id, 0});
-  if (!f_block)
-    return DB_CORRUPTION;
-  dberr_t err= recv_validate_deferred_fpage(*f_block)
-    ? recv_create_deferred_space(f_block, f_name)
-    : DB_CORRUPTION;
-  deferred_spaces.remove(space_id);
-  f_block->unfix();
+  dberr_t err= DB_SUCCESS;
+  if (buf_block_t *f_block= recv_sys.recover({space_id, 0}))
+  {
+    err= recv_validate_deferred_fpage(*f_block)
+      ? recv_create_deferred_space(f_block, f_name)
+      : DB_CORRUPTION;
+    f_block->unfix();
+  }
   return err;
 }
 
@@ -766,6 +766,7 @@ dberr_t deferred_spaces_::reinit_all()
   for (const auto &d : defers)
     if (dberr_t err= recv_init_deferred_space(d.first, d.second.file_name))
       return err;
+  defers.clear();
   return DB_SUCCESS;
 }
 
@@ -2948,25 +2949,22 @@ void recv_sys_t::apply(bool last_batch)
       page_recv_t &recs= p->second;
       ut_ad(!recs.log.empty());
 
-      uint32_t space_id= page_id.space();
-      const deferred_spaces_::defer_ *defer_space=
-        deferred_spaces.find(space_id);
-
-      if (defer_space)
+      const uint32_t space_id= page_id.space();
+      if (auto defer_space= deferred_spaces.find(space_id))
       {
-	mysql_mutex_unlock(&mutex);
-        dberr_t err= recv_init_deferred_space(
-          space_id, defer_space->file_name);
-        if (err != DB_SUCCESS)
-	{
-	  /* Print error and remove the redo log related
-	  to space id */
-	}
-	mysql_mutex_lock(&mutex);
-	p= pages.lower_bound(page_id);
-	continue;
+        mysql_mutex_unlock(&mutex);
+        if (dberr_t err= recv_init_deferred_space(space_id,
+                                                  defer_space->file_name))
+        {
+          ib::error() << "FIXME " << err;
+          /* Print error and remove the redo log related
+          to space id */
+        }
+        deferred_spaces.remove(space_id);
+        mysql_mutex_lock(&mutex);
+        p= pages.lower_bound(page_id);
+        continue;
       }
-
 
       switch (recs.state) {
       case page_recv_t::RECV_BEING_READ:
