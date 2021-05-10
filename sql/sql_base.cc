@@ -1,5 +1,5 @@
 /* Copyright (c) 2000, 2016, Oracle and/or its affiliates.
-   Copyright (c) 2010, 2020, MariaDB
+   Copyright (c) 2010, 2021, MariaDB
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -4192,8 +4192,17 @@ bool open_tables(THD *thd, const DDL_options_st &options,
   DBUG_ENTER("open_tables");
 
   /* Data access in XA transaction is only allowed when it is active. */
-  if (*start && thd->transaction->xid_state.check_has_uncommitted_xa())
-    DBUG_RETURN(true);
+  for (TABLE_LIST *table= *start; table; table= table->next_global)
+    if (!table->schema_table)
+    {
+      if (thd->transaction->xid_state.check_has_uncommitted_xa())
+      {
+	thd->transaction->xid_state.er_xaer_rmfail();
+        DBUG_RETURN(true);
+      }
+      else
+        break;
+    }
 
   thd->current_tablenr= 0;
 restart:
@@ -5306,7 +5315,6 @@ bool open_normal_and_derived_tables(THD *thd, TABLE_LIST *tables, uint flags,
   uint counter;
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
   DBUG_ENTER("open_normal_and_derived_tables");
-  DBUG_ASSERT(!thd->fill_derived_tables());
   if (open_tables(thd, &tables, &counter, flags, &prelocking_strategy) ||
       mysql_handle_derived(thd->lex, dt_phases))
     goto end;
@@ -5364,7 +5372,7 @@ bool open_tables_only_view_structure(THD *thd, TABLE_LIST *table_list,
                                            MYSQL_OPEN_GET_NEW_TABLE |
                                            (can_deadlock ?
                                             MYSQL_OPEN_FAIL_ON_MDL_CONFLICT : 0)),
-                                          DT_INIT | DT_PREPARE | DT_CREATE));
+                                          DT_INIT | DT_PREPARE));
   /*
     Restore old value of sql_command back as it is being looked at in
     process_table() function.

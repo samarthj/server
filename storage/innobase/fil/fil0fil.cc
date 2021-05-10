@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2021, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2014, 2021, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
@@ -1569,8 +1569,8 @@ fil_space_t *fil_space_t::check_pending_operations(ulint id)
 
   if (space)
   {
-    const uint32_t n= space->acquire_low();
-    ut_ad(!(n & STOPPING));
+    space->reacquire();
+    ut_ad(!(space->pending() & STOPPING));
 
     if (space->crypt_data)
     {
@@ -2566,7 +2566,7 @@ fil_ibd_load(
 	space = fil_space_get_by_id(space_id);
 	mysql_mutex_unlock(&fil_system.mutex);
 
-	if (space != NULL) {
+	if (space) {
 		/* Compare the filename we are trying to open with the
 		filename from the first node of the tablespace we opened
 		previously. Fail if it is different. */
@@ -2578,8 +2578,8 @@ fil_ibd_load(
 				<< "' with space ID " << space->id
 				<< ". Another data file called " << node->name
 				<< " exists with the same space ID.";
-				space = NULL;
-				return(FIL_LOAD_ID_CHANGED);
+			space = NULL;
+			return(FIL_LOAD_ID_CHANGED);
 		}
 		return(FIL_LOAD_OK);
 	}
@@ -2634,13 +2634,6 @@ fil_ibd_load(
 		}
 
 		if (file.space_id() != space_id) {
-			ib::info()
-				<< "Ignoring data file '"
-				<< file.filepath()
-				<< "' with space ID " << file.space_id()
-				<< ", since the redo log references "
-				<< file.filepath() << " with space ID "
-				<< space_id << ".";
 			return(FIL_LOAD_ID_CHANGED);
 		}
 tablespace_check:
