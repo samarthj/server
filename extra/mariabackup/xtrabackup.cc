@@ -4691,7 +4691,7 @@ void backup_fix_ddl(CorruptedPages &corrupted_pages)
 
 	DBUG_EXECUTE_IF("check_mdl_lock_works", DBUG_ASSERT(new_tables.size() == 0););
 
-	for (auto t : new_tables) {
+	for (const auto &t : new_tables) {
 		if (!check_if_skip_table(t.second.c_str())) {
 			xb_load_single_table_tablespace(t.second, false,
 							t.first);

@@ -763,7 +763,7 @@ static dberr_t recv_init_deferred_space(uint32_t space_id,
 tablespace went well */
 dberr_t deferred_spaces_::reinit_all()
 {
-  for (auto d : defers)
+  for (const auto &d : defers)
     if (dberr_t err= recv_init_deferred_space(d.first, d.second.file_name))
       return err;
   return DB_SUCCESS;
@@ -3076,7 +3076,7 @@ next_page:
   else
   {
     /* In the last batch, we will apply any rename operations. */
-    for (auto r : renamed_spaces)
+    for (const auto &r : renamed_spaces)
     {
       const uint32_t id= r.first;
       fil_space_t *space= fil_space_t::get(id);
