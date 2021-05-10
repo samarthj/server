@@ -142,9 +142,9 @@ flush logs;
 --write_file $MYSQLTEST_VARDIR/tmp/bug14157.sql
 create table if not exists t5 (a int);
 set names latin1;
-create temporary table `äöüÄÖÜ` (a int);
-insert into `äöüÄÖÜ` values (1);
-insert into t5 select * from `äöüÄÖÜ`
+create temporary table `ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½` (a int);
+insert into `ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½` values (1);
+insert into t5 select * from `ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½`
 EOF
 --exec $MYSQL test < $MYSQLTEST_VARDIR/tmp/bug14157.sql
 --remove_file $MYSQLTEST_VARDIR/tmp/bug14157.sql
@@ -156,7 +156,7 @@ EOF
 ### Starting master-bin.000005
 flush logs;
 # Due to BUG#18337 that wrongly suppresses the BINLOG EVENTS when
-# --short-form is used, the "insert into t5 select * from `äöüÄÖÜ`"
+# --short-form is used, the "insert into t5 select * from `ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½`"
 # which is unsafe and thus written to the binary log in the row
 # format is not executed. This makes the assertion select * from t5 
 # /* must be (1),(1) */; to fail. To temporary fix the bug, we
@@ -521,18 +521,21 @@ remove_file $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn.empty;
 remove_file $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn;
 
 #
-# WL#5625: Deprecate mysqlbinlog options --base64-output=always and --base64-output
+# MDEV-25222: Remove mysqlbinlog options --base64-output=always and --base64-output
 #
---echo # Expect deprecation warning.
---exec $MYSQL_BINLOG --base64-output=always std_data/master-bin.000001 > /dev/null 2> $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn
---cat_file $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn
+--echo #
+--echo # Expect error for invalid --base64-output argument value.
+--echo # MYSQL_BINLOG std_data/master-bin.000001 --base64-output=always 2>&1
+--replace_result $MYSQL_BINDIR MYSQL_BINDIR
+--error 1
+--exec $MYSQL_BINLOG std_data/master-bin.000001 --base64-output=always 2>&1
 
---echo # Expect deprecation warning again.
---exec $MYSQL_BINLOG --base64-output std_data/master-bin.000001 > /dev/null 2> $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn
---cat_file $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn
-
-# Clean up this part of the test.
---remove_file $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn
+--echo #
+--echo # Expect error for incomplete --base64-output argument.
+--echo # MYSQL_BINLOG  std_data/master-bin.000001 --base64-output 2>&1
+--replace_result $MYSQL_BINDIR MYSQL_BINDIR
+--error 1
+--exec $MYSQL_BINLOG std_data/master-bin.000001 --base64-output 2>&1
 
 # BUG#50914
 # This test verifies if the approach of the mysqlbinlog prints
