@@ -1,3 +1,0 @@
-partition_datadir : MDEV-24626 FIXME
-data_directory : MDEV-24626 FIXME
-create_with_data_directory_during_backup : MDEV-24626 FIXME

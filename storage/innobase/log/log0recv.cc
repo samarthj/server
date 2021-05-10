@@ -614,7 +614,30 @@ public:
   @param lsn	log sequence number */
   void add(uint32_t space, const std::string &f_name, lsn_t lsn)
   {
-    char *fil_path= fil_make_filepath(nullptr, {f_name.data(), f_name.size()},
+    const char *filename= f_name.c_str();
+    if (srv_operation == SRV_OPERATION_RESTORE)
+    {
+      /* Replace absolute DATA DIRECTORY file paths with
+      short names relative to the backup directory. */
+      const char *name= strrchr(filename, '/');
+#ifdef _WIN32
+      if (const char *last= strrchr(filename, '\\'))
+        if (last > name)
+          name= last;
+#endif
+      if (name)
+      {
+        while (--name > filename &&
+#ifdef _WIN32
+               *name != '\\' &&
+#endif
+               *name != '/');
+        if (name > filename)
+          filename= name + 1;
+       }
+    }
+
+    char *fil_path= fil_make_filepath(nullptr, {filename, strlen(filename)},
                                       IBD, false);
     const defer_ defer= {lsn, fil_path};
     auto p= defers.emplace(space, defer);
