@@ -33,12 +33,9 @@ public:
     DBUG_ASSERT(a->type() == Item::FIELD_ITEM);
   }
 
-  virtual bool val_bool();
-  virtual longlong val_int()
-  {
-    return (val_bool() ? 1 : 0);
-  }
-  bool fix_length_and_dec()
+  bool val_bool() override;
+  longlong val_int() override { return val_bool(); }
+  bool fix_length_and_dec() override
   {
     set_maybe_null();
     null_value= 0;
@@ -46,13 +43,13 @@ public:
     max_length= 1;
     return FALSE;
   }
-  virtual LEX_CSTRING func_name_cstring() const override
+  LEX_CSTRING func_name_cstring() const override
   {
     static LEX_CSTRING name= {STRING_WITH_LEN("is_history") };
     return name;
   }
-  virtual void print(String *str, enum_query_type query_type);
-  Item *get_copy(THD *thd)
+  void print(String *str, enum_query_type query_type) override;
+  Item *get_copy(THD *thd) override
   { return get_item_copy<Item_func_history>(thd, this); }
 };
 
