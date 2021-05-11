@@ -740,7 +740,7 @@ bool recv_sys_t::recover_deferred(uint32_t space_id, const std::string &name,
     /* No pages were recovered. We create a dummy tablespace,
     and let dict_drop_index_tree() delete the file. */
     if (it != recv_spaces.end())
-      recv_space(it, name, nullptr, 1);
+      recv_space(it, name, nullptr, 0);
     return false;
   }
 

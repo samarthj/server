@@ -3340,10 +3340,10 @@ static void xb_load_single_table_tablespace(const char *dirname,
 	}
 
 	for (int i = 0; i < 10; i++) {
+		file->m_defer = false;
 		err = file->validate_first_page(&flush_lsn);
 
 		if (file->m_defer) {
-
 			if (defer_space_id) {
 				defer = true;
 				file->set_space_id(defer_space_id);
@@ -3351,17 +3351,17 @@ static void xb_load_single_table_tablespace(const char *dirname,
 				err = DB_SUCCESS;
 				break;
 			}
-
-			delete file;
-			ut_free(name);
-			return;
-		}
-
-		if (err != DB_CORRUPTION) {
+		} else if (err != DB_CORRUPTION) {
 			break;
 		}
 
 		my_sleep(1000);
+	}
+
+	if (!defer && file->m_defer) {
+		delete file;
+		ut_free(name);
+		return;
 	}
 
 	bool is_empty_file = file->exists() && file->is_empty_file();
@@ -3409,10 +3409,9 @@ static void xb_load_single_table_tablespace(const std::string &space_name,
   buf[sizeof buf - 1]= '\0';
   const char *dbname= buf;
   char *p= strchr(buf, '/');
-  if (p == 0)
+  if (!p)
     die("Unexpected tablespace %s filename %s", space_name.c_str(),
         name.c_str());
-  ut_a(p);
   *p= 0;
   const char *tablename= p + 1;
   xb_load_single_table_tablespace(dbname, tablename, is_remote,
