@@ -507,13 +507,18 @@ err_exit:
 	ulint logical_size = fil_space_t::logical_size(m_flags);
 
 	if (srv_page_size != logical_size) {
+		free_first_page();
+		if (recv_recovery_is_on()
+		    || srv_operation == SRV_OPERATION_BACKUP) {
+			m_defer= true;
+			return DB_SUCCESS;
+		}
 		/* Logical size must be innodb_page_size. */
 		ib::error()
 			<< "Data file '" << m_filepath << "' uses page size "
 			<< logical_size << ", but the innodb_page_size"
 			" start-up parameter is "
 			<< srv_page_size;
-		free_first_page();
 		return(DB_ERROR);
 	}
 
@@ -542,8 +547,16 @@ err_exit:
 		fil_node_t* node = UT_LIST_GET_FIRST(space->chain);
 
 		if (node && !strcmp(m_filepath, node->name)) {
+ok_exit:
 			mysql_mutex_unlock(&fil_system.mutex);
 			return DB_SUCCESS;
+		}
+
+		if (!m_space_id
+		    && (recv_recovery_is_on()
+			|| srv_operation == SRV_OPERATION_BACKUP)) {
+			m_defer= true;
+			goto ok_exit;
 		}
 
 		/* Make sure the space_id has not already been opened. */
