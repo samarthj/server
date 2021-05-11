@@ -3310,7 +3310,7 @@ public:
   virtual ~Type_all_attributes() {}
   virtual void set_type_maybe_null(bool maybe_null_arg)= 0;
   // Returns total number of decimal digits
-  virtual uint decimal_precision() const= 0;
+  virtual decimal_digits_t decimal_precision() const= 0;
   virtual const TYPELIB *get_typelib() const= 0;
   virtual void set_typelib(const TYPELIB *typelib)= 0;
 };

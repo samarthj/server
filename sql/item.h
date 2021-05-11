@@ -1804,7 +1804,7 @@ public:
   inline uint float_length(uint decimals_par) const
   { return decimals < FLOATING_POINT_DECIMALS ? (DBL_DIG+2+decimals_par) : DBL_DIG+8;}
   /* Returns total number of decimal digits */
-  uint decimal_precision() const override
+  decimal_digits_t decimal_precision() const override
   {
     return type_handler()->Item_decimal_precision(this);
   }
@@ -4349,8 +4349,8 @@ public:
   Item *clone_item(THD *thd) override;
   void print(String *str, enum_query_type query_type) override;
   Item *neg(THD *thd) override;
-  uint decimal_precision() const override
-  { return (uint) (max_length - MY_TEST(value < 0)); }
+  decimal_digits_t decimal_precision() const override
+  { return (decimal_digits_t) (max_length - MY_TEST(value < 0)); }
   Item *get_copy(THD *thd) override
   { return get_item_copy<Item_int>(thd, this); }
 };
@@ -4406,7 +4406,8 @@ public:
   double val_real() override { return ulonglong2double((ulonglong)value); }
   Item *clone_item(THD *thd) override;
   Item *neg(THD *thd) override;
-  uint decimal_precision() const override{ return max_length; }
+  decimal_digits_t decimal_precision() const override
+  { return decimal_digits_t(max_length); }
   Item *get_copy(THD *thd) override
   { return get_item_copy<Item_uint>(thd, this); }
 };
@@ -4465,7 +4466,7 @@ public:
     str->append(str_value);
   }
   Item *neg(THD *thd) override;
-  uint decimal_precision() const override
+  decimal_digits_t decimal_precision() const override
   { return decimal_value.precision(); }
   void set_decimal_value(my_decimal *value_par);
   Item *get_copy(THD *thd) override
@@ -4863,7 +4864,7 @@ public:
     Item_hex_constant(thd, str, str_length) {}
   const Type_handler *type_handler() const override
   { return &type_handler_hex_hybrid; }
-  uint decimal_precision() const override;
+  decimal_digits_t decimal_precision() const override;
   double val_real() override
   {
     return (double) (ulonglong) Item_hex_hybrid::val_int();
@@ -4993,11 +4994,11 @@ public:
     collation= DTCollation_numeric();
     decimals= 0;
   }
-  Item_temporal_literal(THD *thd, uint dec_arg):
+  Item_temporal_literal(THD *thd, decimal_digits_t dec_arg):
     Item_literal(thd)
   {
     collation= DTCollation_numeric();
-    decimals= (decimal_digits_t) dec_arg;
+    decimals= dec_arg;
   }
 
   int save_in_field(Field *field, bool no_conversions) override

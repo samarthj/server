@@ -228,7 +228,7 @@ public:
   { return &type_handler_bool; }
   CHARSET_INFO *compare_collation() const override { return NULL; }
   bool fix_length_and_dec() override { decimals=0; max_length=1; return FALSE; }
-  uint decimal_precision() const override { return 1; }
+  decimal_digits_t decimal_precision() const override { return 1; }
   bool need_parentheses_in_default() override { return true; }
 };
 
@@ -1051,7 +1051,7 @@ public:
   Item_func_strcmp(THD *thd, Item *a, Item *b):
     Item_long_func(thd, a, b) {}
   longlong val_int() override;
-  uint decimal_precision() const override { return 1; }
+  decimal_digits_t decimal_precision() const override { return 1; }
   LEX_CSTRING func_name_cstring() const override
   {
     static LEX_CSTRING name= {STRING_WITH_LEN("strcmp") };
@@ -1097,7 +1097,7 @@ public:
     static LEX_CSTRING name= {STRING_WITH_LEN("interval") };
     return name;
   }
-  uint decimal_precision() const override { return 2; }
+  decimal_digits_t decimal_precision() const override { return 2; }
   void print(String *str, enum_query_type query_type) override
   {
     str->append(func_name_cstring());
