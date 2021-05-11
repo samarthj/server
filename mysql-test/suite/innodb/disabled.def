@@ -11,4 +11,3 @@
 ##############################################################################
 
 create-index-debug : MDEV-13680 InnoDB may crash when btr_page_alloc() fails
-log_file_name : FIXME: "Fault 5" hangs due to corrupted t2.ibd

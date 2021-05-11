@@ -405,6 +405,14 @@ public:
   {
     return UNIV_UNLIKELY(recovery_on) ? recover_low(page_id) : nullptr;
   }
+
+  /** Try to recover a tablespace that was not readable earlier
+  @param space_id   tablespace identifier
+  @param name       tablespace file name
+  @param free_block spare buffer block
+  @return whether recovery failed */
+  bool recover_deferred(uint32_t space_id, const std::string &name,
+                        buf_block_t *&free_block);
 };
 
 /** The recovery system */
