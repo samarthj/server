@@ -420,9 +420,6 @@ Item::Item(THD *thd):
    /* Initially this item is not attached to any JOIN_TAB. */
   join_tab_idx= MAX_TABLES;
 
-   /* thd is NULL in case of static items like Item_true */
-  if (!thd)
-    return;
   /* Put item in free list so that we can free all items at end */
   next= thd->free_list;
   thd->free_list= this;
@@ -438,6 +435,20 @@ Item::Item(THD *thd):
     if (place == SELECT_LIST || place == IN_HAVING)
       thd->lex->current_select->select_n_having_items++;
   }
+}
+
+/*
+  This is only used for static const items
+*/
+
+Item::Item():
+  name(null_clex_str), orig_name(0), is_expensive_cache(-1)
+{
+  base_flags= item_base_t::FIXED;
+  with_flags= item_with_t::NONE;
+  null_value= 0;
+  marker= 0;
+  join_tab_idx= MAX_TABLES;
 }
 
 
@@ -3645,19 +3656,6 @@ void Item_int::print(String *str, enum_query_type query_type)
   // my_charset_bin is good enough for numbers
   buf.set_int(value, unsigned_flag, &my_charset_bin);
   str->append(buf);
-}
-
-
-/*
-  This function is needed to ensure that Item_bool_static doesn't change
-  the value of the member str_value.
-*/
-
-void Item_bool::print(String *str, enum_query_type query_type)
-{
-  // my_charset_bin is good enough for numbers
-  String tmp(value ? (char*) "1" : (char*) "0" , 1, &my_charset_bin);
-  str->append(tmp);
 }
 
 

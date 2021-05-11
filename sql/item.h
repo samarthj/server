@@ -1085,6 +1085,7 @@ public:
      optimisation changes in prepared statements
   */
   Item(THD *thd, Item *item);
+  Item();                                        /* For const item */
   virtual ~Item()
   {
 #ifdef EXTRA_DEBUG
@@ -2925,6 +2926,7 @@ protected:
     fix_charset_and_length(str.charset(), dv, Metadata(&str));
   }
   Item_basic_value(THD *thd): Item(thd) {}
+  Item_basic_value(): Item() {}
 public:
   Field *create_tmp_field_ex(MEM_ROOT *root,
                              TABLE *table, Tmp_field_src *src,
@@ -2954,6 +2956,7 @@ class Item_basic_constant :public Item_basic_value
 {
 public:
   Item_basic_constant(THD *thd): Item_basic_value(thd) {};
+  Item_basic_constant(): Item_basic_value() {};
   bool check_vcol_func_processor(void *arg) { return false; }
   const Item_const *get_item_const() const { return this; }
   virtual Item_basic_constant *make_string_literal_concat(THD *thd,
@@ -3332,6 +3335,8 @@ class Item_literal: public Item_basic_constant
 public:
   Item_literal(THD *thd): Item_basic_constant(thd)
   { }
+  Item_literal(): Item_basic_constant()
+  {}
   Type type() const override { return CONST_ITEM; }
   bool check_partition_func_processor(void *int_arg) override { return false;}
   bool const_item() const override { return true; }
@@ -3345,6 +3350,7 @@ class Item_num: public Item_literal
 {
 public:
   Item_num(THD *thd): Item_literal(thd) { collation= DTCollation_numeric(); }
+  Item_num(): Item_literal() { collation= DTCollation_numeric(); }
   Item *safe_charset_converter(THD *thd, CHARSET_INFO *tocs) override;
   bool get_date(THD *thd, MYSQL_TIME *ltime, date_mode_t fuzzydate) override
   {
@@ -4320,6 +4326,13 @@ public:
       name.str= str_arg; name.length= safe_strlen(name.str);
       unsigned_flag= flag;
     }
+  Item_int(const char *str_arg,longlong i,size_t length):
+    Item_num(), value(i)
+    {
+      max_length=(uint32)length;
+      name.str= str_arg; name.length= safe_strlen(name.str);
+      unsigned_flag= 1;
+    }
   Item_int(THD *thd, const char *str_arg, size_t length=64);
   const Type_handler *type_handler() const override
   { return type_handler_long_or_longlong(); }
@@ -4354,8 +4367,9 @@ public:
   Item_bool(THD *thd, const char *str_arg, longlong i):
     Item_int(thd, str_arg, i, 1) {}
   Item_bool(THD *thd, bool i) :Item_int(thd, (longlong) i, 1) { }
+  Item_bool(const char *str_arg, longlong i):
+    Item_int(str_arg, i, 1) {}
   bool is_bool_literal() const override { return true; }
-  void print(String *str, enum_query_type query_type) override;
   Item *neg_transformer(THD *thd) override;
   const Type_handler *type_handler() const override
   { return &type_handler_bool; }
@@ -4375,7 +4389,7 @@ class Item_bool_static :public Item_bool
 {
 public:
   Item_bool_static(const char *str_arg, longlong i):
-    Item_bool(NULL, str_arg, i) {};
+    Item_bool(str_arg, i) {};
 
   void set_join_tab_idx(uint8 join_tab_idx_arg) override
   { DBUG_ASSERT(0); }
