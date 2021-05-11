@@ -1546,6 +1546,7 @@ struct handlerton
 			    THD *victim_thd, my_bool signal);
    int (*set_checkpoint)(handlerton *hton, const XID* xid);
    int (*get_checkpoint)(handlerton *hton, XID* xid);
+   void (*binlog_recovery_info)(char *fine_name, my_off_t *pos);
    /*
      Optional clauses in the CREATE/ALTER TABLE
    */
@@ -5174,6 +5175,7 @@ int ha_delete_table_force(THD *thd, const char *path, const LEX_CSTRING *db,
 void ha_prepare_for_backup();
 void ha_end_backup();
 void ha_pre_shutdown();
+void ha_last_committed_binlog_pos(char *binlog_name, my_off_t *pos);
 
 /* statistics and info */
 bool ha_show_status(THD *thd, handlerton *db_type, enum ha_stat_type stat);

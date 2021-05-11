@@ -10457,6 +10457,7 @@ int TC_LOG_BINLOG::recover(LOG_INFO *linfo, const char *last_log_name,
   HASH xids;
   MEM_ROOT mem_root;
   char binlog_checkpoint_name[FN_REFLEN];
+  my_off_t binlog_recovery_pos= 4;
   bool binlog_checkpoint_found;
   bool first_round;
   IO_CACHE log;
@@ -10648,6 +10649,11 @@ int TC_LOG_BINLOG::recover(LOG_INFO *linfo, const char *last_log_name,
 
   if (do_xa)
   {
+    if (!binlog_checkpoint_found)
+      binlog_checkpoint_name[0]='\0';
+    ha_last_committed_binlog_pos(binlog_checkpoint_name, &binlog_recovery_pos);
+    fprintf(stderr,"--------Engine_recovery_file:%s\n", binlog_checkpoint_name);
+    fprintf(stderr,"--------Engine_recovery_pos:%llu\n", binlog_recovery_pos);
     if (ha_recover(&xids))
       goto err2;
 

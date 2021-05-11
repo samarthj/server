@@ -33,6 +33,7 @@
 #include "sql_base.h"           // TDC_element
 #include "discover.h"           // extension_based_table_discovery, etc
 #include "log_event.h"          // *_rows_log_event
+#include "sql_repl.h"           // compare_log_name
 #include "create_options.h"
 #include <myisampack.h>
 #include "transaction.h"
@@ -2169,6 +2170,49 @@ int ha_commit_or_rollback_by_xid(XID *xid, bool commit)
                  MYSQL_STORAGE_ENGINE_PLUGIN, &xaop);
 
   return xaop.result;
+}
+
+struct binlog_coordinates
+{
+  char *file_name; // binlog file name (directories stripped)
+  my_off_t  *pos;       // event's position in the binlog file
+};
+
+
+static my_bool binlog_recovery_info_handlerton(THD *, plugin_ref plugin,
+                                               void *arg)
+{
+  struct binlog_coordinates chkpt_coord;
+  char engine_file_name[FN_REFLEN];
+  my_off_t engine_pos;
+  chkpt_coord.file_name= ((struct binlog_coordinates *)arg)->file_name;
+  chkpt_coord.pos= ((struct binlog_coordinates *)arg)->pos;
+  handlerton *hton= plugin_hton(plugin);
+  if (hton->binlog_recovery_info)
+  {
+    hton->binlog_recovery_info(engine_file_name, &engine_pos);
+    int cmp= compare_log_name(engine_file_name, chkpt_coord.file_name);
+    if (cmp > 0)
+    {
+      memcpy(chkpt_coord.file_name, engine_file_name, FN_REFLEN);
+      *chkpt_coord.pos= engine_pos;
+    }
+    else if (cmp == 0)
+    {
+      if (engine_pos > *chkpt_coord.pos)
+        *chkpt_coord.pos= engine_pos;
+    }
+  }
+  return FALSE;
+}
+void ha_last_committed_binlog_pos(char *binlog_name, my_off_t *pos)
+{
+  struct binlog_coordinates linfo;
+  linfo.file_name= binlog_name;
+  linfo.pos= pos;
+  plugin_foreach(NULL, binlog_recovery_info_handlerton,
+                 MYSQL_STORAGE_ENGINE_PLUGIN, &linfo);
+
 }
 
 
