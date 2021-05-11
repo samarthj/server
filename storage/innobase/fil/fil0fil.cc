@@ -2652,13 +2652,13 @@ tablespace_check:
 			ib::error() << "Could not measure the size of"
 				" single-table tablespace file '"
 				<< file.filepath() << "'";
+		} else if (deferred_space) {
+			return FIL_LOAD_DEFER;
 		} else if (size < minimum_size) {
 			ib::error() << "The size of tablespace file '"
 				<< file.filepath() << "' is only " << size
 				<< ", should be at least " << minimum_size
 				<< "!";
-		} else if (deferred_space) {
-			return FIL_LOAD_DEFER;
 		} else {
 			/* Everything is fine so far. */
 			break;

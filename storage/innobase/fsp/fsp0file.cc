@@ -280,11 +280,8 @@ Datafile::read_first_page(bool read_only_mode)
 		} else if (srv_operation == SRV_OPERATION_BACKUP) {
 			break;
 		} else {
-
-			ib::error()
-				<< "Cannot read first page of '"
-				<< m_filepath << "' "
-				<< err;
+			ib::error() << "Cannot read first page of '"
+				<< m_filepath << "': " << err;
 			break;
 		}
 	}
@@ -424,6 +421,9 @@ Datafile::validate_for_recovery()
 				" the first 64 pages.";
 			return(err);
 		}
+		if (m_space_id == ULINT_UNDEFINED) {
+			return DB_SUCCESS; /* empty file */
+		}
 
 		if (restore_from_doublewrite()) {
 			return(DB_CORRUPTION);
@@ -467,11 +467,18 @@ dberr_t Datafile::validate_first_page(lsn_t *flush_lsn)
 
 	if (error_txt != NULL) {
 err_exit:
+		free_first_page();
+
+		if (recv_recovery_is_on()
+		    || srv_operation == SRV_OPERATION_BACKUP) {
+			m_defer= true;
+			return DB_SUCCESS;
+		}
+
 		ib::info() << error_txt << " in datafile: " << m_filepath
 			<< ", Space ID:" << m_space_id  << ", Flags: "
 			<< m_flags;
 		m_is_valid = false;
-		free_first_page();
 		return(DB_CORRUPTION);
 	}
 
@@ -486,12 +493,6 @@ err_exit:
 		}
 
 		if (nonzero_bytes == 0) {
-			if (recv_recovery_is_on()
-			    || srv_operation == SRV_OPERATION_BACKUP) {
-				free_first_page();
-				m_defer= true;
-				return DB_SUCCESS;
-			}
 			error_txt = "Header page consists of zero bytes";
 			goto err_exit;
 		}
@@ -580,6 +581,10 @@ Datafile::find_space_id()
 	ut_ad(m_handle != OS_FILE_CLOSED);
 
 	file_size = os_file_get_size(m_handle);
+
+	if (!file_size) {
+		return DB_SUCCESS;
+	}
 
 	if (file_size == (os_offset_t) -1) {
 		ib::error() << "Could not get file size of datafile '"
