@@ -5083,7 +5083,7 @@ class Item_time_literal final: public Item_temporal_literal
 protected:
   Time cached_time;
 public:
-  Item_time_literal(THD *thd, const Time *ltime, uint dec_arg):
+  Item_time_literal(THD *thd, const Time *ltime, decimal_digits_t dec_arg):
     Item_temporal_literal(thd, dec_arg),
     cached_time(*ltime)
   {
@@ -5132,7 +5132,8 @@ protected:
             (null_value= cached_time.check_date_with_warn(current_thd)));
   }
 public:
-  Item_datetime_literal(THD *thd, const Datetime *ltime, uint dec_arg):
+  Item_datetime_literal(THD *thd, const Datetime *ltime,
+                        decimal_digits_t dec_arg):
     Item_temporal_literal(thd, dec_arg),
     cached_time(*ltime)
   {
@@ -5226,7 +5227,8 @@ class Item_datetime_literal_for_invalid_dates final: public Item_datetime_litera
 {
 public:
   Item_datetime_literal_for_invalid_dates(THD *thd,
-                                          const Datetime *ltime, uint dec_arg)
+                                          const Datetime *ltime,
+                                          decimal_digits_t dec_arg)
    :Item_datetime_literal(thd, ltime, dec_arg)
   {
     base_flags&= ~item_base_t::MAYBE_NULL;
