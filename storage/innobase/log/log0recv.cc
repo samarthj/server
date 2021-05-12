@@ -705,16 +705,16 @@ deferred_spaces;
 /** Create a deferred tablespace based on page 0 block.
 @param it         tablespace iterator
 @param name       latest file name
+@param flags      FSP_SPACE_FLAGS
 @param crypt_data encryption metadata
 @param size       tablespace size in pages
 @return tablespace */
 static fil_space_t *recv_space(const recv_spaces_t::const_iterator &it,
-                                       const std::string &name,
-                                       fil_space_crypt_t *crypt_data,
-                                       uint32_t size)
+                               const std::string &name, uint32_t flags,
+                               fil_space_crypt_t *crypt_data, uint32_t size)
 {
   fil_space_t *space= fil_space_t::create(
-    it->first, it->second.flags, FIL_TYPE_TABLESPACE, crypt_data);
+    it->first, flags, FIL_TYPE_TABLESPACE, crypt_data);
   ut_ad(space);
   space->add(name.c_str(), OS_FILE_CLOSED, size, false, false);
   space->recv_size= it->second.size;
@@ -740,7 +740,9 @@ bool recv_sys_t::recover_deferred(uint32_t space_id, const std::string &name,
     /* No pages were recovered. We create a dummy tablespace,
     and let dict_drop_index_tree() delete the file. */
     if (it != recv_spaces.end())
-      recv_space(it, name, nullptr, 0);
+      recv_space(it, name, static_cast<uint32_t>
+                 (1U << FSP_FLAGS_FCRC32_POS_MARKER |
+                  FSP_FLAGS_FCRC32_PAGE_SSIZE()), nullptr, 0);
     return false;
   }
 
@@ -766,7 +768,7 @@ bool recv_sys_t::recover_deferred(uint32_t space_id, const std::string &name,
         fil_space_t::is_valid_flags(flags, space_id) &&
         fil_space_t::logical_size(flags) == srv_page_size)
     {
-      fil_space_t *space= recv_space(it, name,
+      fil_space_t *space= recv_space(it, name, flags,
                                      fil_space_read_crypt_data
                                      (fil_space_t::zip_size(flags), page),
                                      size);
