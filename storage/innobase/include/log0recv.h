@@ -407,11 +407,12 @@ public:
   }
 
   /** Try to recover a tablespace that was not readable earlier
-  @param space_id   tablespace identifier
+  @param p          iterator, initially pointing to page_id_t{space_id,0};
+                    the records will be freed and the iterator advanced
   @param name       tablespace file name
   @param free_block spare buffer block
   @return whether recovery failed */
-  bool recover_deferred(uint32_t space_id, const std::string &name,
+  bool recover_deferred(map::iterator &p, const std::string &name,
                         buf_block_t *&free_block);
 };
 

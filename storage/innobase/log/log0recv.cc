@@ -681,8 +681,21 @@ retry:
 
     for (auto d= defers.begin(); d != defers.end(); )
     {
-      fail= recv_sys.recover_deferred(d->first, d->second.file_name,
-                                      free_block);
+      const uint32_t space_id{d->first};
+      recv_sys_t::map::iterator p{recv_sys.pages.lower_bound({space_id,0})};
+
+      if (p == recv_sys.pages.end() || p->first.space() != space_id)
+      {
+        /* No pages were recovered. We create a dummy tablespace,
+        and let dict_drop_index_tree() delete the file. */
+        recv_spaces_t::iterator it{recv_spaces.find(space_id)};
+	if (it != recv_spaces.end())
+          create(it, d->second.file_name, static_cast<uint32_t>
+                 (1U << FSP_FLAGS_FCRC32_POS_MARKER |
+                 FSP_FLAGS_FCRC32_PAGE_SSIZE()), nullptr, 0);
+      }
+      else
+        fail= recv_sys.recover_deferred(p, d->second.file_name, free_block);
       auto e= d++;
       defers.erase(e);
       if (fail)
@@ -699,54 +712,49 @@ retry:
       buf_pool.free_block(free_block);
     return fail;
   }
+
+  /** Create tablespace metadata for a data file that was initially
+  found corrupted during recovery.
+  @param it         tablespace iterator
+  @param name       latest file name
+  @param flags      FSP_SPACE_FLAGS
+  @param crypt_data encryption metadata
+  @param size       tablespace size in pages
+  @return tablespace */
+  static fil_space_t *create(const recv_spaces_t::const_iterator &it,
+                             const std::string &name, uint32_t flags,
+                             fil_space_crypt_t *crypt_data, uint32_t size)
+  {
+    fil_space_t *space= fil_space_t::create(it->first, flags,
+                                            FIL_TYPE_TABLESPACE, crypt_data);
+    ut_ad(space);
+    space->add(name.c_str(), OS_FILE_CLOSED, size, false, false);
+    space->recv_size= it->second.size;
+    space->size_in_header= size;
+    return space;
+  }
 }
 deferred_spaces;
 
-/** Create a deferred tablespace based on page 0 block.
-@param it         tablespace iterator
-@param name       latest file name
-@param flags      FSP_SPACE_FLAGS
-@param crypt_data encryption metadata
-@param size       tablespace size in pages
-@return tablespace */
-static fil_space_t *recv_space(const recv_spaces_t::const_iterator &it,
-                               const std::string &name, uint32_t flags,
-                               fil_space_crypt_t *crypt_data, uint32_t size)
-{
-  fil_space_t *space= fil_space_t::create(
-    it->first, flags, FIL_TYPE_TABLESPACE, crypt_data);
-  ut_ad(space);
-  space->add(name.c_str(), OS_FILE_CLOSED, size, false, false);
-  space->recv_size= it->second.size;
-  space->size_in_header= size;
-  return space;
-}
-
 /** Try to recover a tablespace that was not readable earlier
-@param space_id   tablespace identifier
+@param p          iterator, initially pointing to page_id_t{space_id,0};
+                  the records will be freed and the iterator advanced
 @param name       tablespace file name
 @param free_block spare buffer block
 @return whether recovery failed */
-bool recv_sys_t::recover_deferred(uint32_t space_id, const std::string &name,
+bool recv_sys_t::recover_deferred(recv_sys_t::map::iterator &p,
+                                  const std::string &name,
                                   buf_block_t *&free_block)
 {
   mysql_mutex_assert_owner(&mutex);
-  const page_id_t first{space_id, 0};
-  map::iterator p= pages.lower_bound(first);
-  auto it= recv_spaces.find(space_id);
 
-  if (p == pages.end() || p->first.space() != space_id)
-  {
-    /* No pages were recovered. We create a dummy tablespace,
-    and let dict_drop_index_tree() delete the file. */
-    if (it != recv_spaces.end())
-      recv_space(it, name, static_cast<uint32_t>
-                 (1U << FSP_FLAGS_FCRC32_POS_MARKER |
-                  FSP_FLAGS_FCRC32_PAGE_SSIZE()), nullptr, 0);
-    return false;
-  }
+  const page_id_t first{p->first};
+  ut_ad(first.space());
 
-  if (p->first == first && p->second.state == page_recv_t::RECV_WILL_NOT_READ)
+  recv_spaces_t::iterator it{recv_spaces.find(first.space())};
+  ut_ad(it != recv_spaces.end());
+
+  if (!first.page_no() && p->second.state == page_recv_t::RECV_WILL_NOT_READ)
   {
     mtr_t mtr;
     buf_block_t *block= recover_low(first, p, mtr, free_block);
@@ -764,14 +772,14 @@ bool recv_sys_t::recover_deferred(uint32_t space_id, const std::string &name,
     ut_ad(it != recv_spaces.end());
 
     if (page_id_t{space_id, page_no} == first && size >= 4 &&
-        it != recv_spaces.end() && flags == it->second.flags &&
+        it != recv_spaces.end() &&
         fil_space_t::is_valid_flags(flags, space_id) &&
         fil_space_t::logical_size(flags) == srv_page_size)
     {
-      fil_space_t *space= recv_space(it, name, flags,
-                                     fil_space_read_crypt_data
-                                     (fil_space_t::zip_size(flags), page),
-                                     size);
+      fil_space_t *space= deferred_spaces.create(it, name, flags,
+                                                 fil_space_read_crypt_data
+                                                 (fil_space_t::zip_size(flags),
+                                                  page), size);
       space->free_limit= fsp_header_get_field(page, FSP_FREE_LIMIT);
       space->free_len= flst_get_len(FSP_HEADER_OFFSET + FSP_FREE + page);
       block->unfix();
@@ -788,7 +796,7 @@ bool recv_sys_t::recover_deferred(uint32_t space_id, const std::string &name,
     block->unfix();
   }
 
-  ib::error() << "Cannot apply log to " << p->first
+  ib::error() << "Cannot apply log to " << first
               << " of corrupted file '" << name << "'";
   return true;
 }
@@ -2971,17 +2979,16 @@ void recv_sys_t::apply(bool last_batch)
       auto d= deferred_spaces.defers.find(space_id);
       if (d != deferred_spaces.defers.end())
       {
-        if (recover_deferred(space_id, d->second.file_name, free_block))
+        if (recover_deferred(p, d->second.file_name, free_block))
         {
           if (!srv_force_recovery)
             set_corrupt_fs();
-          do
+          while (p != pages.end() && p->first.space() == space_id)
           {
             map::iterator r= p++;
             r->second.log.clear();
             pages.erase(r);
           }
-          while (p != pages.end() && p->first.space() == space_id);
         }
         deferred_spaces.defers.erase(d);
         if (!free_block)
