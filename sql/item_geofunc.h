@@ -974,7 +974,7 @@ public:
     return name;
   }
   bool fix_length_and_dec() override { decimals=0; max_length=2; return FALSE; }
-  uint decimal_precision() const override { return 1; }
+  decimal_digits_t decimal_precision() const override { return 1; }
   Item *get_copy(THD *thd) override
   { return get_item_copy<Item_func_issimple>(thd, this); }
 };
@@ -991,7 +991,7 @@ public:
     return name;
   }
   bool fix_length_and_dec() override { decimals=0; max_length=2; return FALSE; }
-  uint decimal_precision() const override { return 1; }
+  decimal_digits_t decimal_precision() const override { return 1; }
   Item *get_copy(THD *thd) override
   { return get_item_copy<Item_func_isclosed>(thd, this); }
 };

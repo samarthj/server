@@ -50,7 +50,8 @@ typedef struct st_mysql_time MYSQL_TIME;
 #define DECIMAL_MAX_FIELD_SIZE DECIMAL_MAX_PRECISION
 
 
-inline uint my_decimal_size(uint precision, decimal_digits_t scale)
+inline uint my_decimal_size(decimal_digits_t precision,
+                            decimal_digits_t scale)
 {
   /*
     Always allocate more space to allow library to put decimal point
@@ -60,9 +61,12 @@ inline uint my_decimal_size(uint precision, decimal_digits_t scale)
 }
 
 
-inline int my_decimal_int_part(uint precision, decimal_digits_t decimals)
+inline decimal_digits_t my_decimal_int_part(decimal_digits_t precision,
+                                            decimal_digits_t decimals)
 {
-  return precision - ((decimals == DECIMAL_NOT_SPECIFIED) ? 0 : decimals);
+  return (decimal_digits_t) (precision -
+                             ((decimals == DECIMAL_NOT_SPECIFIED) ? 0 :
+                              decimals));
 }
 
 
@@ -147,7 +151,7 @@ public:
   {
     init();
   }
-  my_decimal(const uchar *bin, int prec, decimal_digits_t scale)
+  my_decimal(const uchar *bin, decimal_digits_t prec, decimal_digits_t scale)
   {
     init();
     check_result(E_DEC_FATAL_ERROR, bin2decimal(bin, this, prec, scale));
@@ -168,7 +172,7 @@ public:
 
   bool sign() const { return decimal_t::sign; }
   void sign(bool s) { decimal_t::sign= s; }
-  uint precision() const { return intg + frac; }
+  decimal_digits_t precision() const { return (decimal_digits_t) (intg + frac); }
   void set_zero()
   {
     /*
@@ -255,7 +259,8 @@ bool str_set_decimal(uint mask, const my_decimal *val, uint fixed_prec,
 extern my_decimal decimal_zero;
 
 inline
-void max_my_decimal(my_decimal *to, int precision, int frac)
+void max_my_decimal(my_decimal *to, decimal_digits_t precision,
+                    decimal_digits_t frac)
 {
   DBUG_ASSERT((precision <= DECIMAL_MAX_PRECISION)&&
               (frac <= DECIMAL_MAX_SCALE));
@@ -279,31 +284,34 @@ inline int check_result_and_overflow(uint mask, int result, my_decimal *val)
   return result;
 }
 
-inline uint my_decimal_length_to_precision(uint length, decimal_digits_t scale,
-                                           bool unsigned_flag)
+inline decimal_digits_t my_decimal_length_to_precision(decimal_digits_t length,
+                                                       decimal_digits_t scale,
+                                                       bool unsigned_flag)
 {
   /* Precision can't be negative thus ignore unsigned_flag when length is 0. */
   DBUG_ASSERT(length || !scale);
-  return (uint) (length - (scale>0 ? 1:0) -
-                 (unsigned_flag || !length ? 0:1));
+  return (decimal_digits_t) (length - (scale>0 ? 1:0) -
+                             (unsigned_flag || !length ? 0:1));
 }
 
-inline uint32 my_decimal_precision_to_length_no_truncation(uint precision,
-                                                           decimal_digits_t scale,
-                                                           bool unsigned_flag)
+inline decimal_digits_t
+my_decimal_precision_to_length_no_truncation(decimal_digits_t precision,
+                                             decimal_digits_t scale,
+                                             bool unsigned_flag)
 {
   /*
     When precision is 0 it means that original length was also 0. Thus
     unsigned_flag is ignored in this case.
   */
   DBUG_ASSERT(precision || !scale);
-  return (uint32)(precision + (scale > 0 ? 1 : 0) +
-                  (unsigned_flag || !precision ? 0 : 1));
+  return (decimal_digits_t)(precision + (scale > 0 ? 1 : 0) +
+                            (unsigned_flag || !precision ? 0 : 1));
 }
 
-inline uint32 my_decimal_precision_to_length(uint precision,
-                                             decimal_digits_t scale,
-                                             bool unsigned_flag)
+inline decimal_digits_t
+my_decimal_precision_to_length(decimal_digits_t precision,
+                               decimal_digits_t scale,
+                               bool unsigned_flag)
 {
   /*
     When precision is 0 it means that original length was also 0. Thus
@@ -316,7 +324,7 @@ inline uint32 my_decimal_precision_to_length(uint precision,
 }
 
 inline
-int my_decimal_string_length(const my_decimal *d)
+uint my_decimal_string_length(const my_decimal *d)
 {
   /* length of string representation including terminating '\0' */
   return decimal_string_size(d);
@@ -324,7 +332,7 @@ int my_decimal_string_length(const my_decimal *d)
 
 
 inline
-int my_decimal_max_length(const my_decimal *d)
+uint my_decimal_max_length(const my_decimal *d)
 {
   /* -1 because we do not count \0 */
   return decimal_string_size(d) - 1;
@@ -332,9 +340,10 @@ int my_decimal_max_length(const my_decimal *d)
 
 
 inline
-int my_decimal_get_binary_size(uint precision, decimal_digits_t scale)
+uint my_decimal_get_binary_size(decimal_digits_t precision,
+                                decimal_digits_t scale)
 {
-  return decimal_bin_size((int)precision, scale);
+  return decimal_bin_size(precision, scale);
 }
 
 
@@ -346,8 +355,8 @@ void my_decimal2decimal(const my_decimal *from, my_decimal *to)
 
 
 inline
-int binary2my_decimal(uint mask, const uchar *bin, my_decimal *d, int prec,
-		      decimal_digits_t scale)
+int binary2my_decimal(uint mask, const uchar *bin, my_decimal *d,
+                      decimal_digits_t prec, decimal_digits_t scale)
 {
   return check_result(mask, bin2decimal(bin, d, prec, scale));
 }

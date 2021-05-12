@@ -1353,7 +1353,7 @@ public:
     return args[0]->type_handler()->Item_func_signed_fix_length_and_dec(this);
   }
   void print(String *str, enum_query_type query_type) override;
-  uint decimal_precision() const override
+  decimal_digits_t decimal_precision() const override
   { return args[0]->decimal_precision(); }
   bool need_parentheses_in_default() override { return true; }
   Item *get_copy(THD *thd) override
@@ -1389,7 +1389,7 @@ public:
   {
     return args[0]->type_handler()->Item_func_unsigned_fix_length_and_dec(this);
   }
-  uint decimal_precision() const override { return max_length; }
+  decimal_digits_t decimal_precision() const override { return max_length; }
   void print(String *str, enum_query_type query_type) override;
   Item *get_copy(THD *thd) override
   { return get_item_copy<Item_func_unsigned>(thd, this); }
@@ -1403,7 +1403,7 @@ public:
   Item_decimal_typecast(THD *thd, Item *a, uint len, decimal_digits_t dec)
    :Item_func(thd, a)
   {
-    decimals= (decimal_digits_t)  dec;
+    decimals= dec;
     collation= DTCollation_numeric();
     fix_char_length(my_decimal_precision_to_length_no_truncation(len, dec,
                                                                  unsigned_flag));
@@ -1718,7 +1718,7 @@ public:
   void fix_length_and_dec_double();
   void fix_length_and_dec_decimal();
   bool fix_length_and_dec() override;
-  uint decimal_precision() const  override
+  decimal_digits_t decimal_precision() const  override
   { return args[0]->decimal_precision(); }
   bool need_parentheses_in_default() override { return true; }
   Item *get_copy(THD *thd) override
@@ -2193,7 +2193,7 @@ public:
     static LEX_CSTRING name= {STRING_WITH_LEN("sign") };
     return name;
   }
-  uint decimal_precision() const override { return 1; }
+  decimal_digits_t decimal_precision() const override { return 1; }
   bool fix_length_and_dec() override { fix_char_length(2); return FALSE; }
   longlong val_int() override;
   Item *get_copy(THD *thd) override
