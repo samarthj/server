@@ -2904,6 +2904,15 @@ buf_block_t *recv_sys_t::recover_low(const page_id_t page_id)
   return block;
 }
 
+inline fil_space_t *fil_system_t::find(const char *path) const
+{
+  mysql_mutex_assert_owner(&mutex);
+  for (fil_space_t &space : fil_system.space_list)
+    if (space.chain.start && !strcmp(space.chain.start->name, path))
+      return &space;
+  return nullptr;
+}
+
 /** Apply buffered log to persistent data pages.
 @param last_batch     whether it is possible to write more redo log */
 void recv_sys_t::apply(bool last_batch)
@@ -3099,48 +3108,6 @@ next_page:
   {
     buf_pool_invalidate();
     mysql_mutex_lock(&log_sys.mutex);
-  }
-#if 1 /* Mariabackup FIXME: Remove or adjust rename_table_in_prepare() */
-  else if (srv_operation != SRV_OPERATION_NORMAL);
-#endif
-  else
-  {
-    /* In the last batch, we will apply any rename operations. */
-    for (const auto &r : renamed_spaces)
-    {
-      const uint32_t id= r.first;
-      fil_space_t *space= fil_space_t::get(id);
-      if (!space)
-        continue;
-      ut_ad(UT_LIST_GET_LEN(space->chain) == 1);
-      const char *old= space->chain.start->name;
-      if (r.second != old)
-      {
-        bool exists;
-        os_file_type_t ftype;
-        const char *new_name= r.second.c_str();
-        if (!os_file_status(new_name, &exists, &ftype) || exists)
-        {
-          ib::error() << "Cannot replay rename of tablespace " << id
-                      << " from '" << old << "' to '" << r.second <<
-                      (exists ? "' because the target file exists" : "'");
-          found_corrupt_fs= true;
-        }
-        else
-        {
-          mysql_mutex_lock(&log_sys.mutex);
-          if (dberr_t err= space->rename(r.second.c_str(), false))
-          {
-            ib::error() << "Cannot replay rename of tablespace " << id
-                        << " to '" << r.second << "': " << err;
-            found_corrupt_fs= true;
-          }
-          mysql_mutex_unlock(&log_sys.mutex);
-        }
-      }
-      space->release();
-    }
-    renamed_spaces.clear();
   }
 
   mysql_mutex_lock(&mutex);
@@ -3710,6 +3677,74 @@ recv_init_crash_recovery_spaces(bool rescan, bool& missing_tablespace)
 	return DB_SUCCESS;
 }
 
+/** Apply any FILE_RENAME records */
+static dberr_t recv_rename_files()
+{
+  mysql_mutex_assert_owner(&recv_sys.mutex);
+  mysql_mutex_assert_owner(&log_sys.mutex);
+
+  dberr_t err= DB_SUCCESS;
+
+  for (const auto &r : renamed_spaces)
+  {
+    const uint32_t id= r.first;
+    fil_space_t *space= fil_space_t::get(id);
+    if (!space)
+      continue;
+    ut_ad(UT_LIST_GET_LEN(space->chain) == 1);
+    char *old= space->chain.start->name;
+    if (r.second != old)
+    {
+      bool exists;
+      os_file_type_t ftype;
+      const char *new_name= r.second.c_str();
+      mysql_mutex_lock(&fil_system.mutex);
+      const fil_space_t *other= nullptr;
+      if (!space->chain.start->is_open() && space->chain.start->deferred &&
+          (other= fil_system.find(new_name)) &&
+          (other->chain.start->is_open() || !other->chain.start->deferred))
+        other= nullptr;
+
+      if (other)
+      {
+        /* Multiple tablespaces use the same file name. This should
+        only be possible if the recovery of both files was deferred
+        (no valid page 0 is contained in either file). We shall not
+        rename the file, just rename the metadata. */
+        ib::info() << "Renaming tablespace metadata " << id
+                   << " from '" << old << "' to '" << r.second
+                   << "' that is also associated with tablespace "
+                   << other->id;
+        space->chain.start->name= mem_strdup(new_name);
+        ut_free(old);
+      }
+      else if (!os_file_status(new_name, &exists, &ftype) || exists)
+      {
+        ib::error() << "Cannot replay rename of tablespace " << id
+                    << " from '" << old << "' to '" << r.second <<
+                    (exists ? "' because the target file exists" : "'");
+        err= DB_TABLESPACE_EXISTS;
+      }
+      else
+      {
+        err= space->rename(new_name, false);
+        if (err != DB_SUCCESS)
+          ib::error() << "Cannot replay rename of tablespace " << id
+                      << " to '" << r.second << "': " << err;
+      }
+      mysql_mutex_unlock(&fil_system.mutex);
+    }
+    space->release();
+    if (err != DB_SUCCESS)
+    {
+      recv_sys.set_corrupt_fs();
+      break;
+    }
+  }
+  renamed_spaces.clear();
+  return err;
+}
+
 /** Start recovering from a redo log checkpoint.
 @param[in]	flush_lsn	FIL_PAGE_FILE_FLUSH_LSN
 of first system tablespace page
@@ -4010,6 +4045,9 @@ completed:
 	recv_no_ibuf_operations = false;
 	ut_d(recv_no_log_write = srv_operation == SRV_OPERATION_RESTORE
 	     || srv_operation == SRV_OPERATION_RESTORE_EXPORT);
+	if (srv_operation == SRV_OPERATION_NORMAL) {
+		err = recv_rename_files();
+	}
 	mysql_mutex_unlock(&recv_sys.mutex);
 	mysql_mutex_unlock(&log_sys.mutex);
 
@@ -4018,8 +4056,12 @@ completed:
 	/* The database is now ready to start almost normal processing of user
 	transactions: transaction rollbacks and the application of the log
 	records in the hash table can be run in background. */
-	const bool fail = deferred_spaces.reinit_all();
-	return fail && !srv_force_recovery ? DB_CORRUPTION : DB_SUCCESS;
+	if (err == DB_SUCCESS && deferred_spaces.reinit_all()
+	    && !srv_force_recovery) {
+		err = DB_CORRUPTION;
+	}
+
+	return err;
 }
 
 bool recv_dblwr_t::validate_page(const page_id_t page_id,

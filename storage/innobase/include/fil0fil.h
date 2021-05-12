@@ -1484,8 +1484,13 @@ public:
   @retval NULL if this was the last */
   fil_space_t* keyrotate_next(fil_space_t* space, bool recheck, bool encrypt);
 
-        /** Extend all open data files to the recovered size */
-        ATTRIBUTE_COLD void extend_to_recv_size();
+  /** Extend all open data files to the recovered size */
+  ATTRIBUTE_COLD void extend_to_recv_size();
+
+  /** Determine if a tablespace associated with a file name exists.
+  @param path   tablespace file name to look for
+  @return a matching tablespace */
+  inline fil_space_t *find(const char *path) const;
 };
 
 /** The tablespace memory cache. */
