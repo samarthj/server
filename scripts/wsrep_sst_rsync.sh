@@ -602,7 +602,7 @@ EOF
     if ! ps -p $MYSQLD_PID >/dev/null
     then
         wsrep_log_error \
-        "Parent mysqld process (PID:$MYSQLD_PID) terminated unexpectedly."
+        "Parent mysqld process (PID: $MYSQLD_PID) terminated unexpectedly."
         kill -- -$MYSQLD_PID
         sleep 1
         exit 32

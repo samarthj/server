@@ -512,10 +512,8 @@ read_cnf()
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
 
-    if [[ $ssyslog -ne -1 ]];then
-        if $MY_PRINT_DEFAULTS mysqld_safe | grep -q -- "--syslog";then
-            ssyslog=1
-        fi
+    if [ $ssyslog -ne -1 ]; then
+        ssyslog=$(in_config 'mysqld_safe' 'syslog')
     fi
 }
 
@@ -813,7 +811,7 @@ monitor_process()
     while true ; do
 
         if ! ps --pid "${WSREP_SST_OPT_PARENT}" &>/dev/null; then
-            wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
+            wsrep_log_error "Parent mysqld process (PID: $WSREP_SST_OPT_PARENT) terminated unexpectedly."
             kill -- -"${WSREP_SST_OPT_PARENT}"
             exit 32
         fi
@@ -1112,7 +1110,7 @@ then
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
-        wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
+        wsrep_log_error "Parent mysqld process (PID: $WSREP_SST_OPT_PARENT) terminated unexpectedly."
         exit 32
     fi
 

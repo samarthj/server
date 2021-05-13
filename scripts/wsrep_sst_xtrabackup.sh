@@ -604,7 +604,7 @@ then
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
-        wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
+        wsrep_log_error "Parent mysqld process (PID: $WSREP_SST_OPT_PARENT) terminated unexpectedly."
         exit 32
     fi
 
