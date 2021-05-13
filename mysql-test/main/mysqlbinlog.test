@@ -532,7 +532,7 @@ remove_file $MYSQLTEST_VARDIR/tmp/mysqlbinlog.warn;
 --echo #
 --echo # Expect error for incomplete --base64-output argument.
 --echo # MYSQL_BINLOG  std_data/master-bin.000001 --base64-output 2>&1
-# The error produces the absolute path of the mysqlbinlog executable, remove it
+# The error produces the absolute path of the mysqlbinlog executable, remove it.
 --replace_regex /.*mysqlbinlog.*:/mysqlbinlog:/i
 --error 1
 --exec $MYSQL_BINLOG std_data/master-bin.000001 --base64-output 2>&1
