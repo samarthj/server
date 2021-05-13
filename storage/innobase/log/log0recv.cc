@@ -3725,13 +3725,16 @@ static dberr_t recv_rename_files()
       }
       else
       {
+        mysql_mutex_unlock(&fil_system.mutex);
         err= space->rename(new_name, false);
         if (err != DB_SUCCESS)
           ib::error() << "Cannot replay rename of tablespace " << id
                       << " to '" << r.second << "': " << err;
+        goto done;
       }
       mysql_mutex_unlock(&fil_system.mutex);
     }
+done:
     space->release();
     if (err != DB_SUCCESS)
     {
