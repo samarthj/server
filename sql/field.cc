@@ -6508,11 +6508,8 @@ double Field_year::val_real(void)
 longlong Field_year::val_int(void)
 {
   DBUG_ASSERT(marked_for_read());
-  DBUG_ASSERT(field_length == 2 || field_length == 4);
   int tmp= (int) ptr[0];
-  if (field_length != 4)
-    tmp%=100;					// Return last 2 char
-  else if (tmp)
+  if (tmp)
     tmp+=1900;
   return (longlong) tmp;
 }
@@ -6525,7 +6522,7 @@ String *Field_year::val_str(String *val_buffer,
   val_buffer->alloc(5);
   val_buffer->length(field_length);
   char *to=(char*) val_buffer->ptr();
-  sprintf(to,field_length == 2 ? "%02d" : "%04d",(int) Field_year::val_int());
+  sprintf(to, "%04d", (int) Field_year::val_int());
   val_buffer->set_charset(&my_charset_numeric);
   return val_buffer;
 }
@@ -6534,7 +6531,7 @@ String *Field_year::val_str(String *val_buffer,
 bool Field_year::get_date(MYSQL_TIME *ltime,date_mode_t fuzzydate)
 {
   int tmp= (int) ptr[0];
-  if (tmp || field_length != 4)
+  if (tmp)
     tmp+= 1900;
   return int_to_datetime_with_warn(get_thd(),
                                    Longlong_hybrid(tmp * 10000, true),
@@ -6545,9 +6542,7 @@ bool Field_year::get_date(MYSQL_TIME *ltime,date_mode_t fuzzydate)
 void Field_year::sql_type(String &res) const
 {
   CHARSET_INFO *cs=res.charset();
-  res.length(cs->cset->snprintf(cs,(char*)res.ptr(),res.alloced_length(),
-                                (field_length == 4 ? "year" : "year(%d)"),
-                                (int) field_length));
+  res.length(cs->cset->snprintf(cs,(char*)res.ptr(),res.alloced_length(), "year"));
 }
 
 

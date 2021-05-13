@@ -2456,7 +2456,7 @@ Note	1287	'YEAR(2)' is deprecated and will be removed in a future release. Pleas
 insert into t1 values (1);
 select hex(concat(a)) from t1;
 hex(concat(a))
-3031
+3230
 create table t2 as select concat(a) from t1;
 show create table t2;
 Table	Create Table
@@ -2775,7 +2775,7 @@ Field	Type	Null	Key	Default	Extra
 a	varchar(2)	YES		NULL	
 select hex(a) from v1;
 hex(a)
-3031
+3230
 drop table t1;
 drop view v1;
 create table t1 (a year);
